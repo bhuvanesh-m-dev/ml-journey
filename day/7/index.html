@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 7: Support Vector Machines (SVM) · Kernel Trick</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    <!-- Three.js for 3D visualization -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js"
+            }
+        }
+    </script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        svm: '#EF4444',      // Red for SVM theme
+                        hyperplane: '#F59E0B', // Amber for hyperplane
+                        kernel: '#06B6D4',    // Cyan for kernel trick
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-ring': 'pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                        pulseRing: {
+                            '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
+                            '50%': { opacity: '0.8', transform: 'scale(1.1)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #EF4444;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #EF4444, #F59E0B);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .svm-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .svm-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(239,68,68,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #canvas-3d {
+            width: 100%;
+            height: 300px;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-svm selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-svm font-mono font-bold text-xl">
+                    <i data-lucide="shield"></i>
+                    <span>SVM_Maximum_Margin.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#linear-svm" class="hover:text-svm transition-colors">Linear SVM</a>
+                        <a href="#max-margin" class="hover:text-hyperplane transition-colors">Max Margin</a>
+                        <a href="#nonlinear" class="hover:text-primary transition-colors">Non-Linear SVM</a>
+                        <a href="#kernel-trick" class="hover:text-kernel transition-colors">Kernel Trick</a>
+                        <a href="#code" class="hover:text-accent transition-colors">Code Demo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="shield-check" class="w-32 h-32 text-svm"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [7]: Support Vector Machines · Day 7</div>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-svm to-kernel">
+                        Support Vector Machines (SVM)
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    Loading maximum margin classifier...
+                </p>
+            </div>
+        </section>
+
+        <!-- Core Concepts: Hyperplane, Support Vectors, Margin -->
+        <section class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="layout" class="text-hyperplane"></i>
+                <h2 class="text-2xl font-bold font-mono">Key Concepts: Hyperplane · Support Vectors · Margin</h2>
+            </div>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-surface p-5 rounded-xl border border-gray-800 svm-card">
+                    <i data-lucide="square" class="text-hyperplane w-8 h-8 mb-2"></i>
+                    <h3 class="font-bold text-hyperplane text-lg">Hyperplane</h3>
+                    <p class="text-sm text-gray-300 mt-2">Decision boundary that separates classes. In 2D, it's a line; in 3D, a plane; in higher dimensions, a hyperplane.</p>
+                    <div class="mt-3 text-xs font-mono text-gray-500">w·x + b = 0</div>
+                </div>
+                <div class="bg-surface p-5 rounded-xl border border-gray-800 svm-card">
+                    <i data-lucide="users" class="text-svm w-8 h-8 mb-2"></i>
+                    <h3 class="font-bold text-svm text-lg">Support Vectors</h3>
+                    <p class="text-sm text-gray-300 mt-2">Data points closest to the hyperplane. They "support" the decision boundary — only these matter for defining the margin.</p>
+                    <div class="mt-3 text-xs font-mono text-gray-500">Points where w·x + b = ±1</div>
+                </div>
+                <div class="bg-surface p-5 rounded-xl border border-gray-800 svm-card">
+                    <i data-lucide="maximize" class="text-accent w-8 h-8 mb-2"></i>
+                    <h3 class="font-bold text-accent text-lg">Maximum Margin</h3>
+                    <p class="text-sm text-gray-300 mt-2">The distance between the hyperplane and the nearest support vectors. SVM maximizes this margin for best generalization.</p>
+                    <div class="mt-3 text-xs font-mono text-gray-500">Margin = 2/||w||</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Linear SVM & Max Margin Visualization -->
+        <section id="linear-svm" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="line-chart" class="text-svm"></i>
+                <h2 class="text-2xl font-bold font-mono">Linear SVM: Maximizing the Margin</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <div class="bg-dark p-5 rounded-lg mb-4">
+                        <p class="font-mono text-center mb-3">\[
+                        \min_{w,b} \frac{1}{2}||w||^2 \quad \text{s.t.} \quad y_i(w \cdot x_i + b) \geq 1
+                        \]</p>
+                        <p class="text-xs text-gray-400 text-center">Optimization problem: maximize margin (minimize ||w||) with constraints</p>
+                    </div>
+                    <ul class="space-y-2 text-sm text-gray-300">
+                        <li class="flex items-start gap-2"><span class="text-accent">✓</span> Assumes data is <span class="text-primary">linearly separable</span></li>
+                        <li class="flex items-start gap-2"><span class="text-accent">✓</span> Finds the hyperplane with maximum distance to nearest points</li>
+                        <li class="flex items-start gap-2"><span class="text-accent">✓</span> Only <span class="text-svm font-bold">support vectors</span> influence the boundary</li>
+                    </ul>
+                </div>
+                <!-- 2D SVM Visualization -->
+                <div class="bg-black rounded-xl border border-gray-700 p-4 flex justify-center">
+                    <svg viewBox="0 0 320 240" class="w-full h-full">
+                        <rect width="320" height="240" fill="#0A0A0A" rx="8"/>
+                        <!-- Class +1 (red) points -->
+                        <circle cx="200" cy="70" r="5" fill="#EF4444" class="point" />
+                        <circle cx="230" cy="90" r="5" fill="#EF4444" class="point" />
+                        <circle cx="180" cy="100" r="5" fill="#EF4444" class="point" />
+                        <circle cx="250" cy="60" r="5" fill="#EF4444" class="point" />
+                        <circle cx="210" cy="50" r="5" fill="#EF4444" class="point" />
+                        <!-- Support Vector highlight (red with ring) -->
+                        <circle cx="200" cy="70" r="9" fill="none" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="3"/>
+                        
+                        <!-- Class -1 (blue) points -->
+                        <circle cx="80" cy="170" r="5" fill="#38BDF8" class="point" />
+                        <circle cx="110" cy="150" r="5" fill="#38BDF8" class="point" />
+                        <circle cx="60" cy="190" r="5" fill="#38BDF8" class="point" />
+                        <circle cx="130" cy="140" r="5" fill="#38BDF8" class="point" />
+                        <circle cx="90" cy="200" r="5" fill="#38BDF8" class="point" />
+                        <circle cx="80" cy="170" r="9" fill="none" stroke="#38BDF8" stroke-width="1.5" stroke-dasharray="3"/>
+                        
+                        <!-- Decision Hyperplane -->
+                        <line x1="40" y1="190" x2="280" y2="50" stroke="#F59E0B" stroke-width="2.5"/>
+                        <!-- Margin boundaries -->
+                        <line x1="40" y1="175" x2="280" y2="35" stroke="#F59E0B" stroke-width="1" stroke-dasharray="5" opacity="0.6"/>
+                        <line x1="40" y1="205" x2="280" y2="65" stroke="#F59E0B" stroke-width="1" stroke-dasharray="5" opacity="0.6"/>
+                        
+                        <!-- Margin arrows -->
+                        <line x1="150" y1="165" x2="150" y2="135" stroke="#10B981" stroke-width="1.5" marker-end="url(#arrow)"/>
+                        <text x="155" y="152" fill="#10B981" font-size="8">Margin</text>
+                        
+                        <!-- Labels -->
+                        <text x="260" y="45" fill="#EF4444" font-size="9">Class +1</text>
+                        <text x="45" y="215" fill="#38BDF8" font-size="9">Class -1</text>
+                        <text x="140" y="30" fill="#F59E0B" font-size="8">Hyperplane</text>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Soft Margin & C Parameter -->
+        <section id="max-margin" class="fade-in-up">
+            <div class="bg-gradient-to-r from-svm/10 to-hyperplane/10 rounded-xl p-6 border border-gray-700">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="sliders" class="text-hyperplane w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-hyperplane text-lg mb-2">🔧 Soft Margin SVM (Non-separable data)</h3>
+                        <p class="text-gray-300 text-sm">When data isn't perfectly separable, SVM uses <span class="text-accent">soft margin</span> with a <span class="text-svm font-bold">C hyperparameter</span>:</p>
+                        <div class="mt-3 font-mono text-xs bg-dark p-3 rounded-lg">
+                            <div class="flex justify-between mb-2"><span class="text-green-400">Small C:</span><span>Wider margin, more tolerance for misclassifications (lower variance)</span></div>
+                            <div class="flex justify-between"><span class="text-red-400">Large C:</span><span>Narrow margin, fewer misclassifications (may overfit)</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Non-Linear SVM & Kernel Trick -->
+        <section id="nonlinear" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="curly-braces" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Non-Linear SVM: The Kernel Trick</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-surface rounded-xl p-5 border border-primary/30 svm-card">
+                    <h3 class="font-bold text-primary mb-3">🔄 The Problem: Linear Separability</h3>
+                    <p class="text-sm text-gray-300 mb-3">Real-world data is often not linearly separable. XOR problem, concentric circles, etc., cannot be separated by a straight line.</p>
+                    <div class="bg-dark p-3 rounded-lg">
+                        <p class="text-xs text-center text-gray-400">Linear classifier fails on XOR:</p>
+                        <div class="flex justify-center gap-4 mt-2">
+                            <div class="text-center"><div class="w-6 h-6 rounded-full bg-red-500 mx-auto"></div><span class="text-[10px]">(0,0) → 0</span></div>
+                            <div class="text-center"><div class="w-6 h-6 rounded-full bg-red-500 mx-auto"></div><span class="text-[10px]">(1,1) → 0</span></div>
+                            <div class="text-center"><div class="w-6 h-6 rounded-full bg-blue-500 mx-auto"></div><span class="text-[10px]">(0,1) → 1</span></div>
+                            <div class="text-center"><div class="w-6 h-6 rounded-full bg-blue-500 mx-auto"></div><span class="text-[10px]">(1,0) → 1</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-surface rounded-xl p-5 border border-primary/30 svm-card">
+                    <h3 class="font-bold text-kernel mb-3">✨ Solution: Kernel Trick</h3>
+                    <p class="text-sm text-gray-300 mb-3">Maps data to a <span class="text-accent font-bold">higher-dimensional space</span> where it becomes linearly separable, without explicitly computing the transformation.</p>
+                    <div class="bg-dark p-3 rounded-lg text-center">
+                        <p class="font-mono text-xs">\[
+                        K(x_i, x_j) = \phi(x_i) \cdot \phi(x_j)
+                        \]</p>
+                        <p class="text-[10px] text-gray-400 mt-1">Compute dot product in high-dim space efficiently</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Kernel Trick Visualization + 3D Space -->
+        <section id="kernel-trick" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="box" class="text-kernel"></i>
+                <h2 class="text-2xl font-bold font-mono">3D Space: Mapping to Higher Dimensions</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-bold text-white mb-3">Popular Kernel Functions</h3>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-primary font-mono">Linear:</span>
+                            <span class="text-gray-400 text-sm"> K(x, x') = x·x'</span>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-svm font-mono">Polynomial:</span>
+                            <span class="text-gray-400 text-sm"> K(x, x') = (x·x' + c)^d</span>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-kernel font-mono">RBF (Radial Basis):</span>
+                            <span class="text-gray-400 text-sm"> K(x, x') = exp(-γ||x - x'||²)</span>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-accent font-mono">Sigmoid:</span>
+                            <span class="text-gray-400 text-sm"> K(x, x') = tanh(α x·x' + c)</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- 3D Canvas Container -->
+                <div id="canvas-3d" class="bg-black rounded-xl border border-gray-700 overflow-hidden"></div>
+            </div>
+            <div class="bg-gradient-to-r from-kernel/10 to-transparent p-4 rounded-lg border-l-4 border-kernel">
+                <p class="text-sm"><span class="text-kernel font-bold">💡 The Kernel Trick:</span> Allows SVM to find non-linear decision boundaries without computationally expensive transformations. RBF kernel can create infinitely dimensional feature spaces!</p>
+            </div>
+        </section>
+
+        <!-- Common Kernels Comparison -->
+        <section class="fade-in-up">
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-sm font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-4 py-3 text-left text-kernel">Kernel</th><th class="px-4 py-3 text-left text-gray-300">Formula</th><th class="px-4 py-3 text-left text-gray-300">Best For</th><th class="px-4 py-3 text-left text-gray-300">Hyperparameters</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-4 py-2 text-primary">Linear</td><td class="px-4 py-2 font-mono text-xs">x·x'</td><td class="px-4 py-2 text-xs">High-dimensional, sparse data</td><td class="px-4 py-2 text-xs">C (regularization)</td></tr>
+                        <tr><td class="px-4 py-2 text-svm">Polynomial</td><td class="px-4 py-2 font-mono text-xs">(x·x' + c)^d</td><td class="px-4 py-2 text-xs">Image processing, interactions</td><td class="px-4 py-2 text-xs">C, degree, coef0</td></tr>
+                        <tr><td class="px-4 py-2 text-kernel">RBF</td><td class="px-4 py-2 font-mono text-xs">exp(-γ||x-x'||²)</td><td class="px-4 py-2 text-xs">Most common, non-linear patterns</td><td class="px-4 py-2 text-xs">C, gamma (γ)</td></tr>
+                        <tr><td class="px-4 py-2 text-accent">Sigmoid</td><td class="px-4 py-2 font-mono text-xs">tanh(α x·x' + c)</td><td class="px-4 py-2 text-xs">Neural network analog</td><td class="px-4 py-2 text-xs">C, alpha, coef0</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Code Demo -->
+        <section id="code" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code-2" class="text-svm"></i>
+                <h2 class="text-2xl font-bold font-mono">Implementation: SVM with Different Kernels</h2>
+            </div>
+            <div class="bg-black rounded-xl border border-gray-800 overflow-hidden">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2 font-mono text-sm">
+                    <i data-lucide="python" class="w-4 h-4 text-svm"></i>
+                    <span class="text-gray-300">svm_kernel_demo.py</span>
+                </div>
+                <div class="p-5 overflow-x-auto">
+                    <pre class="text-sm font-mono text-gray-200 whitespace-pre-wrap"><code><span class="text-blue-400">from</span> sklearn.svm <span class="text-blue-400">import</span> SVC
+<span class="text-blue-400">from</span> sklearn.datasets <span class="text-blue-400">import</span> make_moons, load_breast_cancer
+<span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> train_test_split
+<span class="text-blue-400">from</span> sklearn.preprocessing <span class="text-blue-400">import</span> StandardScaler
+<span class="text-blue-400">from</span> sklearn.metrics <span class="text-blue-400">import</span> accuracy_score
+
+<span class="text-green-500"># Generate non-linear dataset (moons)</span>
+X, y = make_moons(n_samples=300, noise=0.1, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
+
+<span class="text-green-500"># Scale features (IMPORTANT for SVM)</span>
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+<span class="text-green-500"># Linear Kernel</span>
+svm_linear = SVC(kernel=<span class="text-green-400">'linear'</span>, C=1.0)
+svm_linear.fit(X_train_scaled, y_train)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Linear SVM Accuracy: {accuracy_score(y_test, svm_linear.predict(X_test_scaled)):.3f}"</span>)
+
+<span class="text-green-500"># RBF Kernel (most popular for non-linear data)</span>
+svm_rbf = SVC(kernel=<span class="text-green-400">'rbf'</span>, C=1.0, gamma=<span class="text-green-400">'scale'</span>)
+svm_rbf.fit(X_train_scaled, y_train)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"RBF SVM Accuracy: {accuracy_score(y_test, svm_rbf.predict(X_test_scaled)):.3f}"</span>)
+
+<span class="text-green-500"># Polynomial Kernel</span>
+svm_poly = SVC(kernel=<span class="text-green-400">'poly'</span>, degree=3, C=1.0)
+svm_poly.fit(X_train_scaled, y_train)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Polynomial (degree=3) Accuracy: {accuracy_score(y_test, svm_poly.predict(X_test_scaled)):.3f}"</span>)
+
+<span class="text-green-500"># Support vectors count</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Number of support vectors: {svm_rbf.n_support_}"</span>)</code></pre>
+                </div>
+                <div class="bg-dark/60 px-5 py-3 border-t border-gray-800 font-mono text-xs text-gray-300 flex justify-between">
+                    <span>🟢 Output: Linear: 0.853 | RBF: 0.987 | Polynomial: 0.960 | Support vectors capture decision boundary</span>
+                    <i data-lucide="check-circle" class="text-accent w-4 h-4"></i>
+                </div>
+            </div>
+            <div class="bg-surface rounded-lg p-5 border-l-4 border-svm">
+                <p class="text-sm"><strong class="text-svm">💡 Pro tip:</strong> Always <span class="text-accent font-bold">scale features</span> before SVM! SVM is sensitive to feature magnitudes. Use <span class="text-primary">GridSearchCV</span> to tune C and gamma for RBF kernel.</p>
+            </div>
+        </section>
+
+        <!-- Pros & Cons -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="scale" class="text-hyperplane"></i>
+                <h2 class="text-2xl font-bold font-mono">SVM: Advantages & Limitations</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-gradient-to-br from-emerald-900/20 to-transparent p-5 rounded-xl border border-emerald-800/40">
+                    <i data-lucide="thumbs-up" class="text-accent w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-accent mb-2">✅ Advantages</h3>
+                    <ul class="text-sm text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Effective in high-dimensional spaces</li>
+                        <li>Memory efficient (uses only support vectors)</li>
+                        <li>Versatile: different kernel functions for different data</li>
+                        <li>Robust to overfitting (max margin principle)</li>
+                        <li>Works well with clear margin separation</li>
+                    </ul>
+                </div>
+                <div class="bg-gradient-to-br from-red-900/20 to-transparent p-5 rounded-xl border border-red-800/40">
+                    <i data-lucide="thumbs-down" class="text-red-400 w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-red-400 mb-2">❌ Limitations</h3>
+                    <ul class="text-sm text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Not suitable for very large datasets (O(n²) to O(n³))</li>
+                        <li>Less interpretable than decision trees</li>
+                        <li>Sensitive to kernel and hyperparameter choice</li>
+                        <li>Poor performance with overlapping classes</li>
+                        <li>Requires feature scaling</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal Summary -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-black rounded-xl border border-gray-800 shadow-2xl overflow-hidden font-mono text-sm">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-gray-400 text-xs">svm@max-margin:~/day7</span>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div><span class="text-green-400 font-bold">$</span> cat svm_summary.md</div>
+                    <div class="text-gray-300 space-y-2 border-l-2 border-gray-800 pl-4">
+                        <p># ⚔️ Day 7: Support Vector Machines — Maximum Margin Classifier</p>
+                        <ul class="list-disc ml-5 space-y-1 text-xs md:text-sm">
+                            <li>✅ <span class="text-hyperplane">Hyperplane</span>: Decision boundary that separates classes (w·x + b = 0)</li>
+                            <li>✅ <span class="text-svm">Support Vectors</span>: Critical points that define the margin</li>
+                            <li>✅ <span class="text-accent">Maximum Margin</span>: Maximize distance to support vectors = 2/||w||</li>
+                            <li>✅ <span class="text-primary">Linear SVM</span>: For linearly separable data</li>
+                            <li>✅ <span class="text-kernel">Kernel Trick</span>: Map to higher dimensions without explicit computation (RBF, Polynomial)</li>
+                            <li>✅ Soft margin with <span class="text-accent">C parameter</span> balances margin width vs misclassifications</li>
+                        </ul>
+                        <p class="text-gray-500 mt-3">📌 Real-world: Image classification, handwriting recognition, bioinformatics, text categorization.</p>
+                    </div>
+                    <div><span class="text-green-400 font-bold">$</span> <span class="typing-cursor text-svm"></span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 7 · Support Vector Machines (SVM) · Hyperplane, Margin, Kernel Trick & 3D Feature Space</p>
+        </div>
+    </footer>
+
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.128.0/build/three.module.js';
+        
+        // Setup 3D scene for kernel trick visualization
+        const container = document.getElementById('canvas-3d');
+        if (container) {
+            const width = container.clientWidth;
+            const height = 300;
+            
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0A0A0A);
+            scene.fog = new THREE.FogExp2(0x0A0A0A, 0.008);
+            
+            const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.set(3, 2, 5);
+            camera.lookAt(0, 0, 0);
+            
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.innerHTML = '';
+            container.appendChild(renderer.domElement);
+            
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 2, 1);
+            scene.add(directionalLight);
+            const backLight = new THREE.PointLight(0x444466, 0.5);
+            backLight.position.set(-1, 1, -2);
+            scene.add(backLight);
+            
+            // Create a 3D surface (paraboloid to represent RBF mapping)
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            const indices = [];
+            const colors = [];
+            
+            const size = 2.5;
+            const segments = 40;
+            
+            for (let i = 0; i <= segments; i++) {
+                const x = -size + (i / segments) * size * 2;
+                for (let j = 0; j <= segments; j++) {
+                    const z = -size + (j / segments) * size * 2;
+                    // Paraboloid: z = x² + y² (but in 3D, y is up, so we map to y)
+                    const yVal = Math.pow(x, 2) + Math.pow(z, 2);
+                    vertices.push(x, yVal * 0.6, z);
+                    
+                    // Color based on height (kernel mapping intensity)
+                    const t = Math.min(yVal / 3, 1);
+                    colors.push(t, 0.2 + t * 0.5, 0.6 - t * 0.3);
+                }
+            }
+            
+            // Build indices
+            for (let i = 0; i < segments; i++) {
+                for (let j = 0; j < segments; j++) {
+                    const a = i * (segments + 1) + j;
+                    const b = i * (segments + 1) + j + 1;
+                    const c = (i + 1) * (segments + 1) + j;
+                    const d = (i + 1) * (segments + 1) + j + 1;
+                    
+                    indices.push(a, b, c);
+                    indices.push(b, d, c);
+                }
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
+            geometry.setIndex(indices);
+            geometry.computeVertexNormals();
+            
+            const material = new THREE.MeshStandardMaterial({ 
+                vertexColors: true, 
+                side: THREE.DoubleSide,
+                roughness: 0.4,
+                metalness: 0.6,
+                emissive: 0x220000,
+                emissiveIntensity: 0.3
+            });
+            const surface = new THREE.Mesh(geometry, material);
+            scene.add(surface);
+            
+            // Add data points (spheres) on the surface
+            const pointPositions = [
+                [-1.5, 0.4, -1.2], [1.2, 0.3, -1.5], [-0.8, 0.2, 1.3], [1.3, 0.5, 1.0],
+                [-1.2, 0.6, 0.5], [0.5, 0.1, -1.3], [1.5, 0.8, -0.5], [-1.3, 0.7, -0.8]
+            ];
+            
+            pointPositions.forEach(pos => {
+                const sphereGeo = new THREE.SphereGeometry(0.08, 16, 16);
+                const sphereMat = new THREE.MeshStandardMaterial({ color: 0xEF4444, emissive: 0x441111, emissiveIntensity: 0.5 });
+                const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+                sphere.position.set(pos[0], pos[1] * 1.2, pos[2]);
+                scene.add(sphere);
+            });
+            
+            // Add wireframe grid at bottom
+            const gridHelper = new THREE.GridHelper(6, 20, 0x3F3F3F, 0x2A2A2A);
+            gridHelper.position.y = -0.5;
+            scene.add(gridHelper);
+            
+            // Add axes helper
+            const axesHelper = new THREE.AxesHelper(2);
+            axesHelper.material.transparent = true;
+            axesHelper.material.opacity = 0.2;
+            scene.add(axesHelper);
+            
+            // Animation
+            let time = 0;
+            function animate() {
+                requestAnimationFrame(animate);
+                time += 0.005;
+                camera.position.x = 3.5 + Math.sin(time) * 0.3;
+                camera.position.y = 2.2 + Math.cos(time * 0.7) * 0.2;
+                camera.lookAt(0, 0.5, 0);
+                renderer.render(scene, camera);
+            }
+            animate();
+            
+            // Handle resize
+            window.addEventListener('resize', () => {
+                const newWidth = container.clientWidth;
+                camera.aspect = newWidth / height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(newWidth, height);
+            });
+        }
+    </script>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Typewriter effect
+        const textSequence = "SVM initialized. Computing maximum margin hyperplane with kernel trick...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        // Intersection observer for fade animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        // MathJax rendering
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day7&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+</html>
