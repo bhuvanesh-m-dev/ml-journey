@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 8: Naive Bayes · Bayes' Theorem & Probabilities</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        bayes: '#8B5CF6',      // Purple for Bayes
+                        naive: '#EC4899',       // Pink for Naive
+                        probability: '#F59E0B', // Amber for probability
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8B5CF6;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #8B5CF6, #EC4899);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .bayes-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .bayes-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(139,92,246,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .probability-badge {
+            background: linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(236,72,153,0.15) 100%);
+        }
+
+        .formula-bg {
+            background: rgba(139,92,246,0.05);
+            border: 1px solid rgba(139,92,246,0.2);
+        }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-bayes selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-bayes font-mono font-bold text-xl">
+                    <i data-lucide="brain"></i>
+                    <span>Naive_Bayes_Classifier.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#bayes-theorem" class="hover:text-bayes transition-colors">Bayes' Theorem</a>
+                        <a href="#naive-assumption" class="hover:text-naive transition-colors">Naive Assumption</a>
+                        <a href="#types" class="hover:text-primary transition-colors">NB Variants</a>
+                        <a href="#example" class="hover:text-probability transition-colors">Worked Example</a>
+                        <a href="#code" class="hover:text-accent transition-colors">Code Demo</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="calculator" class="w-32 h-32 text-bayes"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [8]: Naive Bayes · Day 8</div>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-bayes to-naive">
+                        Naive Bayes: Probability-Based Classification
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    Loading probabilistic classifier...
+                </p>
+            </div>
+        </section>
+
+        <!-- Bayes' Theorem Foundation -->
+        <section id="bayes-theorem" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="sigma" class="text-bayes"></i>
+                <h2 class="text-2xl font-bold font-mono">Bayes' Theorem: The Foundation</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="bg-surface rounded-xl p-6 border border-gray-800 bayes-card">
+                    <div class="formula-bg rounded-lg p-5 text-center mb-4">
+                        \[
+                        P(A|B) = \frac{P(B|A) \cdot P(A)}{P(B)}
+                        \]
+                    </div>
+                    <p class="text-gray-300 text-sm mb-3">Where:</p>
+                    <ul class="space-y-2 text-sm">
+                        <li><span class="text-bayes font-bold">P(A|B)</span> = <span class="text-probability">Posterior Probability</span> (What we want to find)</li>
+                        <li><span class="text-bayes font-bold">P(B|A)</span> = <span class="text-primary">Likelihood</span> (Probability of evidence given hypothesis)</li>
+                        <li><span class="text-bayes font-bold">P(A)</span> = <span class="text-accent">Prior Probability</span> (Initial belief)</li>
+                        <li><span class="text-bayes font-bold">P(B)</span> = <span class="text-naive">Evidence Probability</span> (Normalizing constant)</li>
+                    </ul>
+                </div>
+                <div class="bg-surface rounded-xl p-6 border border-gray-800 bayes-card">
+                    <h3 class="text-lg font-bold text-probability mb-3 flex items-center gap-2"><i data-lucide="glasses" class="w-5 h-5"></i> Intuitive Explanation</h3>
+                    <p class="text-sm text-gray-300 mb-4">Bayes' Theorem describes the probability of an event based on prior knowledge of conditions that might be related to the event.</p>
+                    <div class="bg-dark p-4 rounded-lg">
+                        <p class="text-xs font-mono text-gray-400">🎯 Real-life analogy:</p>
+                        <p class="text-sm text-gray-300 mt-1">"The probability of having a disease given a positive test result depends on how accurate the test is AND how common the disease is in the population."</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Naive Assumption (Conditional Independence) -->
+        <section id="naive-assumption" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="git-branch" class="text-naive"></i>
+                <h2 class="text-2xl font-bold font-mono">The "Naive" Assumption: Conditional Independence</h2>
+            </div>
+            <div class="bg-surface rounded-xl p-6 border border-gray-800">
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <p class="text-gray-300 text-sm mb-4">Naive Bayes assumes that <span class="text-naive font-bold">all features are independent</span> given the class label. This is rarely true in reality, but the algorithm still works surprisingly well!</p>
+                        <div class="formula-bg rounded-lg p-4 text-center">
+                            \[
+                            P(C|X_1, X_2, ..., X_n) \propto P(C) \prod_{i=1}^{n} P(X_i|C)
+                            \]
+                        </div>
+                        <p class="text-xs text-gray-400 text-center mt-2">Features are conditionally independent given class C</p>
+                    </div>
+                    <div class="bg-dark p-4 rounded-lg">
+                        <p class="text-sm font-bold text-primary mb-2">🎯 Why "Naive"?</p>
+                        <ul class="space-y-2 text-sm text-gray-300">
+                            <li class="flex items-start gap-2"><span class="text-accent">•</span> In reality, features like "age" and "income" ARE correlated</li>
+                            <li class="flex items-start gap-2"><span class="text-accent">•</span> But the naive assumption simplifies calculations drastically</li>
+                            <li class="flex items-start gap-2"><span class="text-accent">•</span> Works well for text classification, spam filtering, sentiment analysis</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Types of Naive Bayes Classifiers -->
+        <section id="types" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="layers" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Types of Naive Bayes Classifiers</h2>
+            </div>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-surface p-5 rounded-xl border border-primary/30 bayes-card">
+                    <i data-lucide="bar-chart" class="text-primary w-8 h-8 mb-2"></i>
+                    <h3 class="font-bold text-primary text-lg">Gaussian NB</h3>
+                    <p class="text-sm text-gray-300 mt-1">For <span class="text-accent">continuous features</span> assumed to follow a normal distribution.</p>
+                    <div class="mt-3 text-xs font-mono text-gray-400">
+                        P(x_i|C) = (1/√(2πσ²))·exp(-(x-μ)²/2σ²)
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500">📊 Example: Height, Weight, Temperature</div>
+                </div>
+                <div class="bg-surface p-5 rounded-xl border border-naive/30 bayes-card">
+                    <i data-lucide="hash" class="text-naive w-8 h-8 mb-2"></i>
+                    <h3 class="font-bold text-naive text-lg">Multinomial NB</h3>
+                    <p class="text-sm text-gray-300 mt-1">For <span class="text-accent">discrete features</span> like word counts (text classification).</p>
+                    <div class="mt-3 text-xs font-mono text-gray-400">
+                        P(x_i|C) = (count of word i in class C + α) / (total words in C + α·n)
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500">📄 Example: Spam detection, document classification</div>
+                </div>
+                <div class="bg-surface p-5 rounded-xl border border-probability/30 bayes-card">
+                    <i data-lucide="toggle-left" class="text-probability w-8 h-8 mb-2"></i>
+                    <h3 class="font-bold text-probability text-lg">Bernoulli NB</h3>
+                    <p class="text-sm text-gray-300 mt-1">For <span class="text-accent">binary features</span> (presence/absence).</p>
+                    <div class="mt-3 text-xs font-mono text-gray-400">
+                        P(x_i|C) = p^y · (1-p)^(1-y)
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500">🎯 Example: Word presence (not count), binary indicators</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Worked Example: Spam Classification -->
+        <section id="example" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="mail" class="text-probability"></i>
+                <h2 class="text-2xl font-bold font-mono">Worked Example: Spam Classification</h2>
+            </div>
+            <div class="bg-surface rounded-xl p-6 border border-gray-800">
+                <p class="text-sm text-gray-300 mb-4">Suppose we want to classify an email containing the word <span class="text-accent font-bold">"free"</span> as Spam or Not Spam.</p>
+                
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-dark p-4 rounded-lg">
+                        <p class="font-bold text-primary mb-2">Training Data:</p>
+                        <div class="space-y-1 text-sm">
+                            <p>• 100 total emails: <span class="text-red-400">30 Spam</span>, <span class="text-green-400">70 Not Spam</span></p>
+                            <p>• "free" appears in: <span class="text-red-400">20 Spam</span> emails, <span class="text-green-400">5 Not Spam</span> emails</p>
+                        </div>
+                    </div>
+                    <div class="bg-dark p-4 rounded-lg">
+                        <p class="font-bold text-primary mb-2">Probabilities:</p>
+                        <div class="space-y-1 text-sm font-mono">
+                            <p>P(Spam) = 30/100 = <span class="text-red-400">0.3</span></p>
+                            <p>P(Not Spam) = 70/100 = <span class="text-green-400">0.7</span></p>
+                            <p>P("free" | Spam) = 20/30 = <span class="text-red-400">0.667</span></p>
+                            <p>P("free" | Not Spam) = 5/70 = <span class="text-green-400">0.071</span></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="formula-bg rounded-lg p-5">
+                    <p class="font-bold text-center mb-3">Applying Bayes' Theorem:</p>
+                    <div class="text-center font-mono text-sm space-y-2">
+                        <p>P(Spam | "free") ∝ P(Spam) × P("free" | Spam) = 0.3 × 0.667 = <span class="text-red-400 font-bold">0.200</span></p>
+                        <p>P(Not Spam | "free") ∝ P(Not Spam) × P("free" | Not Spam) = 0.7 × 0.071 = <span class="text-green-400 font-bold">0.050</span></p>
+                        <div class="border-t border-gray-700 my-2"></div>
+                        <p class="text-accent font-bold">After normalization: P(Spam | "free") = 0.200 / (0.200 + 0.050) = 0.800 (80%)</p>
+                        <p class="text-accent font-bold">P(Not Spam | "free") = 0.050 / 0.250 = 0.200 (20%)</p>
+                        <p class="text-white mt-2">🎯 <span class="text-accent">Prediction: SPAM</span> (80% probability)</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Laplace Smoothing (To handle zero probabilities) -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-bayes/10 to-naive/10 rounded-xl p-6 border border-gray-700">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="shield" class="text-probability w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-probability text-lg mb-2">🧴 Laplace Smoothing (Add-α Smoothing)</h3>
+                        <p class="text-gray-300 text-sm">When a feature never appears in training for a class, P(feature|class) = 0 → whole probability becomes 0. <span class="text-accent">Laplace smoothing</span> fixes this:</p>
+                        <div class="mt-3 font-mono text-xs bg-dark p-3 rounded-lg text-center">
+                            \[
+                            P(x_i|C) = \frac{\text{count}(x_i, C) + \alpha}{\text{total}(C) + \alpha \cdot n}
+                            \]
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2">α = 1 (Laplace), α = 0.5 (Lidstone). Prevents zero probabilities.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Comparison Table: Naive Bayes vs Other Algorithms -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="table" class="text-secondary"></i>
+                <h2 class="text-2xl font-bold font-mono">Naive Bayes vs Other Classifiers</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-sm font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-4 py-3 text-left text-gray-300">Aspect</th><th class="px-4 py-3 text-left text-bayes">Naive Bayes</th><th class="px-4 py-3 text-left text-primary">Logistic Regression</th><th class="px-4 py-3 text-left text-svm">SVM</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-4 py-2">Training Speed</td><td class="px-4 py-2 text-accent">Very Fast (O(n))</td><td class="px-4 py-2">Fast</td><td class="px-4 py-2">Moderate</td></tr>
+                        <tr><td class="px-4 py-2">Data Efficiency</td><td class="px-4 py-2 text-accent">Works with small data</td><td class="px-4 py-2">Needs moderate data</td><td class="px-4 py-2">Needs moderate data</td></tr>
+                        <tr><td class="px-4 py-2">Feature Independence</td><td class="px-4 py-2 text-probability">Assumes (Naive!)</td><td class="px-4 py-2">Does not assume</td><td class="px-4 py-2">Does not assume</td></tr>
+                        <tr><td class="px-4 py-2">Probabilistic Output</td><td class="px-4 py-2 text-accent">Yes (natural)</td><td class="px-4 py-2">Yes</td><td class="px-4 py-2">No (needs Platt scaling)</td></tr>
+                        <tr><td class="px-4 py-2">High-Dimensional Data</td><td class="px-4 py-2 text-accent">Excellent (text)</td><td class="px-4 py-2">Good</td><td class="px-4 py-2">Good</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Code Demo -->
+        <section id="code" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code-2" class="text-bayes"></i>
+                <h2 class="text-2xl font-bold font-mono">Implementation: Scikit-learn Naive Bayes</h2>
+            </div>
+            <div class="bg-black rounded-xl border border-gray-800 overflow-hidden">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2 font-mono text-sm">
+                    <i data-lucide="python" class="w-4 h-4 text-bayes"></i>
+                    <span class="text-gray-300">naive_bayes_demo.py</span>
+                </div>
+                <div class="p-5 overflow-x-auto">
+                    <pre class="text-sm font-mono text-gray-200 whitespace-pre-wrap"><code><span class="text-blue-400">from</span> sklearn.naive_bayes <span class="text-blue-400">import</span> GaussianNB, MultinomialNB, BernoulliNB
+<span class="text-blue-400">from</span> sklearn.feature_extraction.text <span class="text-blue-400">import</span> CountVectorizer
+<span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> train_test_split
+<span class="text-blue-400">from</span> sklearn.metrics <span class="text-blue-400">import</span> accuracy_score, classification_report
+<span class="text-blue-400">from</span> sklearn.datasets <span class="text-blue-400">import</span> load_iris, fetch_20newsgroups
+
+<span class="text-green-500"># ========== GAUSSIAN NB (Continuous Features) ==========</span>
+iris = load_iris()
+X_train, X_test, y_train, y_test = train_test_split(iris.data, iris.target, random_state=42)
+
+gnb = GaussianNB()
+gnb.fit(X_train, y_train)
+y_pred = gnb.predict(X_test)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Gaussian NB Accuracy: {accuracy_score(y_test, y_pred):.3f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Class Priors: {gnb.class_prior_}"</span>)
+
+<span class="text-green-500"># ========== MULTINOMIAL NB (Text Classification) ==========</span>
+categories = [<span class="text-green-400">'alt.atheism'</span>, <span class="text-green-400">'soc.religion.christian'</span>]
+newsgroups = fetch_20newsgroups(subset=<span class="text-green-400">'all'</span>, categories=categories, shuffle=True, random_state=42)
+
+vectorizer = CountVectorizer(stop_words=<span class="text-green-400">'english'</span>, max_features=5000)
+X = vectorizer.fit_transform(newsgroups.data)
+y = newsgroups.target
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
+
+mnb = MultinomialNB(alpha=1.0)  <span class="text-green-500"># Laplace smoothing</span>
+mnb.fit(X_train, y_train)
+y_pred = mnb.predict(X_test)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Multinomial NB Accuracy: {accuracy_score(y_test, y_pred):.3f}"</span>)
+<span class="text-yellow-400">print</span>(classification_report(y_test, y_pred, target_names=categories))</code></pre>
+                </div>
+                <div class="bg-dark/60 px-5 py-3 border-t border-gray-800 font-mono text-xs text-gray-300 flex justify-between">
+                    <span>📊 Output: Gaussian NB: 0.973 | Multinomial NB: 0.967 | Fast, probabilistic, great for text!</span>
+                    <i data-lucide="check-circle" class="text-accent w-4 h-4"></i>
+                </div>
+            </div>
+            <div class="bg-surface rounded-lg p-5 border-l-4 border-bayes">
+                <p class="text-sm"><strong class="text-bayes">💡 When to use Naive Bayes:</strong> Text classification (spam detection, sentiment analysis), high-dimensional data, real-time prediction (very fast), small datasets, multi-class problems.</p>
+            </div>
+        </section>
+
+        <!-- Pros & Cons -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="scale" class="text-probability"></i>
+                <h2 class="text-2xl font-bold font-mono">Naive Bayes: Strengths & Weaknesses</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-gradient-to-br from-emerald-900/20 to-transparent p-5 rounded-xl border border-emerald-800/40">
+                    <i data-lucide="thumbs-up" class="text-accent w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-accent mb-2">✅ Advantages</h3>
+                    <ul class="text-sm text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Extremely fast training and prediction</li>
+                        <li>Works well with high-dimensional data (text, genomics)</li>
+                        <li>Handles missing data naturally</li>
+                        <li>Provides probabilistic predictions</li>
+                        <li>Requires less training data than complex models</li>
+                        <li>Highly scalable (O(nd) training time)</li>
+                    </ul>
+                </div>
+                <div class="bg-gradient-to-br from-red-900/20 to-transparent p-5 rounded-xl border border-red-800/40">
+                    <i data-lucide="thumbs-down" class="text-red-400 w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-red-400 mb-2">❌ Limitations</h3>
+                    <ul class="text-sm text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Naive independence assumption rarely true in real data</li>
+                        <li>Poor probability estimates (calibration issues)</li>
+                        <li>Cannot learn feature interactions</li>
+                        <li>Zero frequency problem (requires smoothing)</li>
+                        <li>Less accurate than ensemble methods for complex tasks</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Real-World Applications -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl p-6 border border-gray-700">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="globe" class="text-primary w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-primary text-lg mb-2">🌍 Real-World Applications</h3>
+                        <div class="grid md:grid-cols-3 gap-3 text-sm">
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">📧 Spam Filtering</span> - Gmail, Outlook</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">❤️ Sentiment Analysis</span> - Product reviews, Twitter</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">📄 Document Classification</span> - News categorization</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">🩺 Medical Diagnosis</span> - Disease prediction</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">🔍 Recommendation Systems</span> - Collaborative filtering</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">🧬 Genomics</span> - Gene expression classification</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal Summary -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-black rounded-xl border border-gray-800 shadow-2xl overflow-hidden font-mono text-sm">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-gray-400 text-xs">bayesian@naive-classifier:~/day8</span>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div><span class="text-green-400 font-bold">$</span> cat naive_bayes_summary.md</div>
+                    <div class="text-gray-300 space-y-2 border-l-2 border-gray-800 pl-4">
+                        <p># 📊 Day 8: Naive Bayes — Probability-Based Classification</p>
+                        <ul class="list-disc ml-5 space-y-1 text-xs md:text-sm">
+                            <li>✅ <span class="text-bayes">Bayes' Theorem</span>: P(A|B) = P(B|A)·P(A) / P(B) — updates beliefs with evidence</li>
+                            <li>✅ <span class="text-naive">Naive Assumption</span>: Features are conditionally independent given the class</li>
+                            <li>✅ <span class="text-primary">Gaussian NB</span>: For continuous, normally distributed features</li>
+                            <li>✅ <span class="text-naive">Multinomial NB</span>: For discrete counts (text classification)</li>
+                            <li>✅ <span class="text-probability">Bernoulli NB</span>: For binary features (presence/absence)</li>
+                            <li>✅ <span class="text-accent">Laplace Smoothing</span> (α=1) prevents zero probabilities</li>
+                        </ul>
+                        <p class="text-gray-500 mt-3">📌 Key Insight: Despite its "naive" assumption, NB often outperforms complex models, especially in text classification!</p>
+                    </div>
+                    <div><span class="text-green-400 font-bold">$</span> <span class="typing-cursor text-bayes"></span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 8 · Naive Bayes · Bayes' Theorem, Conditional Independence & Probabilistic Classification</p>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Typewriter effect
+        const textSequence = "Bayes' Theorem loaded. Calculating posterior probabilities with naive independence assumption...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        // Intersection observer for fade animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        // MathJax rendering
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day8&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+  </html>
