@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 13: Deeper Pandas · Advanced Data Mastery</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        pandas: '#FF6B6B',
+                        group: '#F59E0B',
+                        window: '#06B6D4',
+                        merge: '#EC4899',
+                        transform: '#8B5CF6',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FF6B6B;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #FF6B6B, #06B6D4);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .pandas-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .pandas-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(255,107,107,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .code-preview {
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            background: #0A0A0A;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        
+        .merge-diagram {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(236,72,153,0.1) 0%, rgba(139,92,246,0.1) 100%);
+            padding: 16px;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-pandas selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-pandas font-mono font-bold text-xl">
+                    <i data-lucide="database"></i>
+                    <span>Deeper_Pandas_Mastery.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#groupby" class="hover:text-pandas transition-colors">GroupBy Deep</a>
+                        <a href="#window" class="hover:text-window transition-colors">Window Functions</a>
+                        <a href="#merge" class="hover:text-merge transition-colors">Merge Strategies</a>
+                        <a href="#transform" class="hover:text-transform transition-colors">Transform & Apply</a>
+                        <a href="#optimization" class="hover:text-primary transition-colors">Optimization</a>
+                        <a href="#pipeline" class="hover:text-accent transition-colors">Pipelines</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="bar-chart-3" class="w-32 h-32 text-pandas"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [13]: Deeper Pandas · Day 13</div>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-pandas to-window">
+                        Deeper Pandas: Master Data Transformation
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    Loading advanced data transformation techniques...
+                </p>
+            </div>
+        </section>
+
+        <!-- Deep GroupBy: Split-Apply-Combine Mastery -->
+        <section id="groupby" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="git-branch" class="text-group"></i>
+                <h2 class="text-2xl font-bold font-mono">Deep GroupBy: Beyond Basic Aggregation</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <p class="text-gray-300 text-sm mb-4">The <span class="text-group font-bold">GroupBy</span> paradigm: <span class="text-accent">Split → Apply → Combine</span>. Master multiple aggregations, custom functions, and grouping on multiple keys.</p>
+                    <div class="code-preview p-3 border border-gray-700 rounded-lg">
+                        <pre class="text-xs text-gray-300"><code><span class="text-pandas">import pandas as pd</span>
+
+df = pd.DataFrame({
+    'dept': ['A','A','B','B','C','C'],
+    'region': ['E','W','E','W','E','W'],
+    'sales': [100,150,200,250,300,350]
+})
+
+<span class="text-green-500"># Multiple aggregations on multiple columns</span>
+result = df.groupby('dept').agg(
+    total_sales=('sales', 'sum'),
+    avg_sales=('sales', 'mean'),
+    count=('sales', 'count')
+)
+
+<span class="text-green-500"># Group by multiple keys</span>
+result2 = df.groupby(['dept', 'region']).agg(
+    total=('sales', 'sum'),
+    std=('sales', 'std')
+)</code></pre>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-group mb-2">📊 Advanced GroupBy Methods:</p>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between border-b border-gray-700 pb-1"><span class="text-accent">.agg()</span><span class="text-gray-400">Multiple aggregations at once</span></div>
+                        <div class="flex justify-between border-b border-gray-700 pb-1"><span class="text-accent">.transform()</span><span class="text-gray-400">Broadcast results back to original shape</span></div>
+                        <div class="flex justify-between border-b border-gray-700 pb-1"><span class="text-accent">.filter()</span><span class="text-gray-400">Keep groups based on condition</span></div>
+                        <div class="flex justify-between border-b border-gray-700 pb-1"><span class="text-accent">.apply()</span><span class="text-gray-400">Custom function per group</span></div>
+                        <div class="flex justify-between"><span class="text-accent">.pipe()</span><span class="text-gray-400">Chain group-specific operations</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-dark/50 p-4 rounded-lg">
+                <p class="text-xs text-gray-400">🎯 <span class="text-group">Pro Tip:</span> Use <code class="text-accent">pd.NamedAgg</code> for explicit column naming in .agg(): <code class="text-accent">.agg(total=pd.NamedAgg('sales', 'sum'))</code></p>
+            </div>
+        </section>
+
+        <!-- Window Functions (Rolling, Expanding, EWM) -->
+        <section id="window" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="trending-up" class="text-window"></i>
+                <h2 class="text-2xl font-bold font-mono">Window Functions: Rolling, Expanding, EWM</h2>
+            </div>
+            <div class="grid md:grid-cols-3 gap-5">
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 pandas-card">
+                    <i data-lucide="move" class="text-window w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-window">Rolling Window</h3>
+                    <p class="text-xs text-gray-400">Moving calculations over fixed window size.</p>
+                    <div class="code-preview p-2 mt-2 text-[10px]">
+                        <code>df['rolling_mean'] = df['value'].rolling(window=7).mean()</code>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 pandas-card">
+                    <i data-lucide="expand" class="text-accent w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-accent">Expanding Window</h3>
+                    <p class="text-xs text-gray-400">Cumulative calculations from start.</p>
+                    <div class="code-preview p-2 mt-2 text-[10px]">
+                        <code>df['cumsum'] = df['value'].expanding().sum()</code>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 pandas-card">
+                    <i data-lucide="activity" class="text-secondary w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-secondary">EWM (Exponential Weighted)</h3>
+                    <p class="text-xs text-gray-400">More weight to recent observations.</p>
+                    <div class="code-preview p-2 mt-2 text-[10px]">
+                        <code>df['ewm'] = df['value'].ewm(span=30).mean()</code>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-r from-window/10 to-transparent rounded-xl p-4 border-l-4 border-window">
+                <p class="text-sm"><span class="text-window font-bold">📈 Financial Applications:</span> Rolling volatility (std), expanding Sharpe ratio, EWM for trend following strategies.</p>
+            </div>
+        </section>
+
+        <!-- Merge Strategies: Inner, Outer, Left, Right, Cross -->
+        <section id="merge" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="git-pull-request" class="text-merge"></i>
+                <h2 class="text-2xl font-bold font-mono">Merge Strategies: Combining DataFrames</h2>
+            </div>
+            <div class="merge-diagram mb-6">
+                <div class="text-center text-xs bg-dark p-2 rounded"><span class="text-merge">Inner Join</span><br/>Only matching keys</div>
+                <i data-lucide="arrow-right" class="w-4 h-4 text-gray-500"></i>
+                <div class="text-center text-xs bg-dark p-2 rounded"><span class="text-accent">Left Join</span><br/>All left keys</div>
+                <i data-lucide="arrow-right" class="w-4 h-4 text-gray-500"></i>
+                <div class="text-center text-xs bg-dark p-2 rounded"><span class="text-window">Right Join</span><br/>All right keys</div>
+                <i data-lucide="arrow-right" class="w-4 h-4 text-gray-500"></i>
+                <div class="text-center text-xs bg-dark p-2 rounded"><span class="text-group">Outer Join</span><br/>All keys from both</div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="code-preview p-4 border border-gray-700 rounded-lg">
+                    <pre class="text-xs"><code><span class="text-green-500"># Different join types</span>
+pd.merge(df1, df2, on='key', how='inner')
+pd.merge(df1, df2, on='key', how='left')
+pd.merge(df1, df2, on='key', how='right')
+pd.merge(df1, df2, on='key', how='outer')
+
+<span class="text-green-500"># Merge on multiple keys</span>
+pd.merge(df1, df2, on=['key1', 'key2'])
+
+<span class="text-green-500"># Merge with different column names</span>
+pd.merge(df1, df2, left_on='id1', right_on='id2')
+
+<span class="text-green-500"># Concatenation (vertical stacking)</span>
+pd.concat([df1, df2], axis=0, ignore_index=True)
+
+<span class="text-green-500"># Join using index</span>
+df1.join(df2, how='left')</code></pre>
+                </div>
+                <div class="bg-dark p-4 rounded-lg">
+                    <p class="text-xs font-bold text-merge mb-2">⚡ Performance Tips for Merging:</p>
+                    <ul class="text-xs text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Sort keys before merging with <code class="text-accent">sort=True</code></li>
+                        <li>Use <code class="text-accent">indicator=True</code> to track merge sources</li>
+                        <li>For large DataFrames, consider <code class="text-accent">dask.dataframe</code></li>
+                        <li>Set indexes on merge keys for faster joins</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Transform and Custom Apply -->
+        <section id="transform" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="wand-2" class="text-transform"></i>
+                <h2 class="text-2xl font-bold font-mono">Transform & Custom Apply: Broadcasting Power</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-surface rounded-xl p-5 border border-gray-800">
+                    <h3 class="font-bold text-transform mb-2">🔄 Transform: Group Results Back to Original Shape</h3>
+                    <div class="code-preview p-3 bg-dark rounded">
+                        <pre class="text-xs"><code><span class="green"># Add group mean to each row</span>
+df['dept_mean'] = df.groupby('dept')['sales'].transform('mean')
+
+<span class="green"># Normalize within group (z-score)</span>
+df['z_score'] = df.groupby('dept')['sales'].transform(
+    lambda x: (x - x.mean()) / x.std()
+)
+
+<span class="green"># Rank within group</span>
+df['rank'] = df.groupby('dept')['sales'].transform('rank', ascending=False)</code></pre>
+                    </div>
+                </div>
+                <div class="bg-surface rounded-xl p-5 border border-gray-800">
+                    <h3 class="font-bold text-group mb-2">📊 Custom Apply: Your Own Logic</h3>
+                    <div class="code-preview p-3 bg-dark rounded">
+                        <pre class="text-xs"><code><span class="green"># Custom aggregation per group</span>
+def custom_agg(group):
+    return pd.Series({
+        'total': group['sales'].sum(),
+        'range': group['sales'].max() - group['sales'].min(),
+        'cv': group['sales'].std() / group['sales'].mean()
+    })
+    
+result = df.groupby('dept').apply(custom_agg)
+
+<span class="green"># Row-wise apply (use carefully!)</span>
+df['category'] = df.apply(
+    lambda row: 'High' if row['sales'] > 200 else 'Low', axis=1
+)</code></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-dark p-3 rounded-lg text-center">
+                <p class="text-xs text-gray-400">⚡ <span class="text-accent">transform()</span> preserves index, <span class="text-accent">apply()</span> can change shape — use transform when possible for speed!</p>
+            </div>
+        </section>
+
+        <!-- Memory Optimization Deep Dive -->
+        <section id="optimization" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="memory-stick" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Memory Optimization: Handling Large Datasets</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <div class="code-preview p-4 border border-gray-700 rounded-lg mb-3">
+                        <pre class="text-xs"><code><span class="green"># 1. Downcast numeric types</span>
+for col in df.select_dtypes('int').columns:
+    df[col] = pd.to_numeric(df[col], downcast='integer')
+    
+for col in df.select_dtypes('float').columns:
+    df[col] = pd.to_numeric(df[col], downcast='float')
+
+<span class="green"># 2. Convert object to categorical</span>
+for col in df.select_dtypes('object').columns:
+    if df[col].nunique() / len(df) < 0.5:  # <50% unique
+        df[col] = df[col].astype('category')
+
+<span class="green"># 3. Read only needed columns</span>
+df = pd.read_csv('large.csv', usecols=['col1', 'col2'])
+
+<span class="green"># 4. Chunk reading for huge files</span>
+chunks = pd.read_csv('huge.csv', chunksize=10000)</code></pre>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-primary mb-2">📊 Memory Comparison:</p>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between"><span>int64 → int8:</span><span class="text-accent">87.5% reduction</span></div>
+                        <div class="flex justify-between"><span>float64 → float32:</span><span class="text-accent">50% reduction</span></div>
+                        <div class="flex justify-between"><span>object → category:</span><span class="text-accent">up to 98% reduction</span></div>
+                        <div class="border-t border-gray-700 pt-2 mt-2"><span class="text-group">💡 Use <code class="text-accent">df.info(memory_usage='deep')</code> to check memory</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Method Chaining and Pipelines -->
+        <section id="pipeline" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="link" class="text-accent"></i>
+                <h2 class="text-2xl font-bold font-mono">Method Chaining & Pipelines: Clean, Readable Code</h2>
+            </div>
+            <div class="bg-surface rounded-xl p-6 border border-gray-800">
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <p class="text-gray-300 text-sm mb-3">Method chaining creates <span class="text-accent">readable, maintainable</span> data transformation pipelines.</p>
+                        <div class="code-preview p-3 bg-dark rounded">
+                            <pre class="text-xs"><code><span class="green"># Without chaining (messy)</span>
+df = pd.read_csv('data.csv')
+df = df.dropna()
+df = df[df['age'] > 18]
+df['salary_k'] = df['salary'] / 1000
+result = df.groupby('dept').mean()
+
+<span class="green"># With chaining (clean!)</span>
+result = (pd.read_csv('data.csv')
+    .dropna()
+    .query('age > 18')
+    .assign(salary_k=lambda x: x['salary'] / 1000)
+    .groupby('dept')
+    .mean()
+)
+
+<span class="green"># Using pipe for custom functions</span>
+def remove_outliers(df, col, threshold=3):
+    z_scores = (df[col] - df[col].mean()) / df[col].std()
+    return df[abs(z_scores) < threshold]
+
+clean_df = (df
+    .pipe(remove_outliers, 'salary')
+    .pipe(remove_outliers, 'age')
+)</code></pre>
+                        </div>
+                    </div>
+                    <div class="bg-dark p-4 rounded-lg">
+                        <p class="text-sm font-bold text-accent mb-2">🔗 Pipeline Best Practices:</p>
+                        <ul class="text-xs text-gray-300 space-y-2 list-disc list-inside">
+                            <li>Use <code class="text-primary">.assign()</code> for creating new columns</li>
+                            <li>Use <code class="text-primary">.query()</code> for filtering (cleaner syntax)</li>
+                            <li>Use <code class="text-primary">.pipe()</code> for custom reusable functions</li>
+                            <li>Wrap pipeline in parentheses for line breaks</li>
+                            <li>Comment each step for clarity</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Advanced Code Demo -->
+        <section id="code" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code-2" class="text-pandas"></i>
+                <h2 class="text-2xl font-bold font-mono">Complete Deep Pandas Demo</h2>
+            </div>
+            <div class="bg-black rounded-xl border border-gray-800 overflow-hidden">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2 font-mono text-sm">
+                    <i data-lucide="python" class="w-4 h-4 text-pandas"></i>
+                    <span class="text-gray-300">deep_pandas_mastery.py</span>
+                </div>
+                <div class="p-5 overflow-x-auto">
+                    <pre class="text-sm font-mono text-gray-200 whitespace-pre-wrap"><code><span class="text-blue-400">import</span> pandas <span class="text-blue-400">as</span> pd
+<span class="text-blue-400">import</span> numpy <span class="text-blue-400">as</span> np
+
+<span class="text-green-500"># ========== CREATE SAMPLE DATA ==========</span>
+np.random.seed(42)
+df = pd.DataFrame({
+    <span class="text-green-400">'date'</span>: pd.date_range(<span class="text-green-400">'2024-01-01'</span>, periods=1000),
+    <span class="text-green-400">'region'</span>: np.random.choice([<span class="text-green-400">'North'</span>, <span class="text-green-400">'South'</span>, <span class="text-green-400">'East'</span>, <span class="text-green-400">'West'</span>], 1000),
+    <span class="text-green-400">'product'</span>: np.random.choice([<span class="text-green-400">'A'</span>, <span class="text-green-400">'B'</span>, <span class="text-green-400">'C'</span>], 1000),
+    <span class="text-green-400">'sales'</span>: np.random.normal(1000, 200, 1000).astype(int),
+    <span class="text-green-400">'units'</span>: np.random.poisson(50, 1000)
+})
+
+<span class="text-green-500"># ========== 1. ADVANCED GROUPBY ==========</span>
+result = (df.groupby([<span class="text-green-400">'region'</span>, <span class="text-green-400">'product'</span>])
+    .agg(
+        total_sales=(<span class="text-green-400">'sales'</span>, <span class="text-green-400">'sum'</span>),
+        avg_units=(<span class="text-green-400">'units'</span>, <span class="text-green-400">'mean'</span>),
+        transaction_count=(<span class="text-green-400">'sales'</span>, <span class="text-green-400">'count'</span>),
+        sales_std=(<span class="text-green-400">'sales'</span>, <span class="text-green-400">'std'</span>)
+    ))
+
+<span class="text-green-500"># ========== 2. WINDOW FUNCTIONS ==========</span>
+df[<span class="text-green-400">'sales_7d_ma'</span>] = df[<span class="text-green-400">'sales'</span>].rolling(window=7).mean()
+df[<span class="text-green-400">'sales_cumsum'</span>] = df[<span class="text-green-400">'sales'</span>].expanding().sum()
+df[<span class="text-green-400">'sales_ewm'</span>] = df[<span class="text-green-400">'sales'</span>].ewm(span=30).mean()
+
+<span class="text-green-500"># ========== 3. TRANSFORM (Group Normalization) ==========</span>
+df[<span class="text-green-400">'region_normalized'</span>] = df.groupby(<span class="text-green-400">'region'</span>)[<span class="text-green-400">'sales'</span>].transform(
+    lambda x: (x - x.mean()) / x.std()
+)
+
+<span class="text-green-500"># ========== 4. METHOD CHAINING PIPELINE ==========</span>
+clean_data = (df
+    .assign(date=lambda x: pd.to_datetime(x[<span class="text-green-400">'date'</span>]))
+    .query(<span class="text-green-400">'sales > 500 and units > 10'</span>)
+    .dropna()
+    .assign(profit=lambda x: x[<span class="text-green-400">'sales'</span>] * 0.25)
+    .groupby([<span class="text-green-400">'region'</span>, pd.Grouper(key=<span class="text-green-400">'date'</span>, freq=<span class="text-green-400">'M'</span>)])
+    .agg(total_profit=(<span class="text-green-400">'profit'</span>, <span class="text-green-400">'sum'</span>))
+)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Shape: {clean_data.shape}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Memory: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB"</span>)</code></pre>
+                </div>
+                <div class="bg-dark/60 px-5 py-3 border-t border-gray-800 font-mono text-xs text-gray-300 flex justify-between">
+                    <span>📊 Output: Multi-level aggregation | Rolling windows | Group transforms | Clean pipeline | Memory optimized</span>
+                    <i data-lucide="check-circle" class="text-accent w-4 h-4"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Reference Table -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="table" class="text-secondary"></i>
+                <h2 class="text-2xl font-bold font-mono">Quick Reference: Deep Pandas Techniques</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-xs font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-3 py-2 text-left text-pandas">Technique</th><th class="px-3 py-2 text-left text-gray-300">Method</th><th class="px-3 py-2 text-left text-gray-300">Use Case</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-3 py-2 text-group">Multi-Agg GroupBy</td><td class="px-3 py-2">.agg(total=('col','sum'), avg=('col','mean'))</td><td class="px-3 py-2">Multiple stats per group</td></tr>
+                        <tr><td class="px-3 py-2 text-window">Rolling Window</td><td class="px-3 py-2">.rolling(7).mean()</td><td class="px-3 py-2">Moving averages</td></tr>
+                        <tr><td class="px-3 py-2 text-window">Expanding Window</td><td class="px-3 py-2">.expanding().sum()</td><td class="px-3 py-2">Cumulative totals</td></tr>
+                        <tr><td class="px-3 py-2 text-transform">Transform</td><td class="px-3 py-2">.groupby().transform('mean')</td><td class="px-3 py-2">Broadcast group stats</td></tr>
+                        <tr><td class="px-3 py-2 text-merge">Merge</td><td class="px-3 py-2">pd.merge(df1, df2, on='key', how='left')</td><td class="px-3 py-2">Combine DataFrames</td></tr>
+                        <tr><td class="px-3 py-2 text-accent">Pipe</td><td class="px-3 py-2">.pipe(custom_function)</td><td class="px-3 py-2">Reusable transforms</td></tr>
+                        <tr><td class="px-3 py-2 text-primary">Memory Opt</td><td class="px-3 py-2">.astype('category'), downcast numeric</td><td class="px-3 py-2">Large dataset handling</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Pro Tips Section -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-pandas/10 to-window/10 rounded-xl p-6 border border-gray-700">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="lightbulb" class="text-pandas w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-primary text-lg mb-2">💡 Pro Tips from Pandas Experts</h3>
+                        <div class="grid md:grid-cols-2 gap-3 text-sm">
+                            <div class="flex items-start gap-2"><span class="text-accent">1.</span> Use <code class="text-accent">pd.options.display.max_columns = None</code> to see all columns</div>
+                            <div class="flex items-start gap-2"><span class="text-accent">2.</span> <code class="text-accent">df.sample(n)</code> for quick data inspection</div>
+                            <div class="flex items-start gap-2"><span class="text-accent">3.</span> <code class="text-accent">df.select_dtypes()</code> for column type filtering</div>
+                            <div class="flex items-start gap-2"><span class="text-accent">4.</span> Use <code class="text-accent">pd.testing.assert_frame_equal()</code> for testing</div>
+                            <div class="flex items-start gap-2"><span class="text-accent">5.</span> <code class="text-accent">df.pipe()</code> is more readable than nested functions</div>
+                            <div class="flex items-start gap-2"><span class="text-accent">6.</span> <code class="text-accent">df.infer_objects()</code> auto-converts dtypes</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal Summary -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-black rounded-xl border border-gray-800 shadow-2xl overflow-hidden font-mono text-sm">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-gray-400 text-xs">deep@data-mastery:~/day13</span>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div><span class="text-green-400 font-bold">$</span> cat deep_pandas_summary.md</div>
+                    <div class="text-gray-300 space-y-2 border-l-2 border-gray-800 pl-4">
+                        <p># 🐼 Day 13: Deeper Pandas — Advanced Data Mastery</p>
+                        <ul class="list-disc ml-5 space-y-1 text-xs md:text-sm">
+                            <li>✅ <span class="text-group">Advanced GroupBy</span> — Multiple aggregations, NamedAgg, custom functions</li>
+                            <li>✅ <span class="text-window">Window Functions</span> — Rolling, Expanding, Exponential Weighted (EWM)</li>
+                            <li>✅ <span class="text-merge">Merge Strategies</span> — Inner, Outer, Left, Right, Cross joins</li>
+                            <li>✅ <span class="text-transform">Transform & Apply</span> — Broadcast group results, custom row/group logic</li>
+                            <li>✅ <span class="text-primary">Memory Optimization</span> — Downcasting, categoricals, chunking, usecols</li>
+                            <li>✅ <span class="text-accent">Method Chaining & Pipelines</span> — Clean, maintainable, readable code</li>
+                        </ul>
+                        <p class="text-gray-500 mt-3">📌 The Pandas Journey: Day 1-10 (basics) → Day 11 (intro) → Day 12 (intermediate) → Day 13 (advanced mastery)</p>
+                    </div>
+                    <div><span class="text-green-400 font-bold">$</span> <span class="typing-cursor text-pandas"></span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 13 · Deeper Pandas · Advanced GroupBy, Window Functions, Merge Strategies, Transform & Pipelines</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const textSequence = "Deep Pandas mastery loaded. Advanced groupby, window functions, and pipelines ready...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day13&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+                                                                                                                            </html>
