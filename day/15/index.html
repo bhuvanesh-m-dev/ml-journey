@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 15: Advanced Feature Selection · Master All Techniques</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        filter: '#F59E0B',
+                        wrapper: '#EC4899',
+                        embedded: '#06B6D4',
+                        hybrid: '#8B5CF6',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F59E0B;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #F59E0B, #EC4899);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .feature-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(245,158,11,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .code-block {
+            background: #0A0A0A;
+            border-radius: 0.5rem;
+            border: 1px solid #262626;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+        }
+
+        .comparison-table {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: #262626;
+        }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-filter selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-filter font-mono font-bold text-xl">
+                    <i data-lucide="git-branch"></i>
+                    <span>Advanced_Feature_Selection.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#filter" class="hover:text-filter transition-colors">Filter Methods</a>
+                        <a href="#wrapper" class="hover:text-wrapper transition-colors">Wrapper Methods</a>
+                        <a href="#embedded" class="hover:text-embedded transition-colors">Embedded Methods</a>
+                        <a href="#hybrid" class="hover:text-hybrid transition-colors">Hybrid</a>
+                        <a href="#comparison" class="hover:text-primary transition-colors">Comparison</a>
+                        <a href="#code" class="hover:text-accent transition-colors">Implementation</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="filter" class="w-32 h-32 text-filter"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [15]: Advanced Feature Selection · Day 15</div>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-filter to-hybrid">
+                        Advanced Feature Selection: Complete Mastery
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    Loading advanced feature selection techniques...
+                </p>
+            </div>
+        </section>
+
+        <!-- Overview: The Feature Selection Landscape -->
+        <section class="space-y-4 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="map" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">The Four Pillars of Feature Selection</h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-gradient-to-br from-filter/20 to-transparent p-4 rounded-xl text-center border border-filter/30">
+                    <i data-lucide="filter" class="text-filter w-8 h-8 mx-auto mb-2"></i>
+                    <h3 class="font-bold text-filter">Filter</h3>
+                    <p class="text-xs text-gray-400">Statistical<br/>Scores</p>
+                </div>
+                <div class="bg-gradient-to-br from-wrapper/20 to-transparent p-4 rounded-xl text-center border border-wrapper/30">
+                    <i data-lucide="package" class="text-wrapper w-8 h-8 mx-auto mb-2"></i>
+                    <h3 class="font-bold text-wrapper">Wrapper</h3>
+                    <p class="text-xs text-gray-400">Model-based<br/>Search</p>
+                </div>
+                <div class="bg-gradient-to-br from-embedded/20 to-transparent p-4 rounded-xl text-center border border-embedded/30">
+                    <i data-lucide="code" class="text-embedded w-8 h-8 mx-auto mb-2"></i>
+                    <h3 class="font-bold text-embedded">Embedded</h3>
+                    <p class="text-xs text-gray-400">Built-in<br/>Regularization</p>
+                </div>
+                <div class="bg-gradient-to-br from-hybrid/20 to-transparent p-4 rounded-xl text-center border border-hybrid/30">
+                    <i data-lucide="git-merge" class="text-hybrid w-8 h-8 mx-auto mb-2"></i>
+                    <h3 class="font-bold text-hybrid">Hybrid</h3>
+                    <p class="text-xs text-gray-400">Combined<br/>Approaches</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filter Methods Deep Dive -->
+        <section id="filter" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="filter" class="text-filter"></i>
+                <h2 class="text-2xl font-bold font-mono">Filter Methods: Statistical Feature Ranking</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <p class="text-gray-300 text-sm mb-4">Filter methods rank features independently of any machine learning model using statistical tests.</p>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-filter font-bold">📊 Variance Threshold:</span>
+                            <p class="text-xs text-gray-400 mt-1">Removes features with variance below threshold (constant or quasi-constant features).</p>
+                            <code class="text-[10px] text-accent">selector = VarianceThreshold(threshold=0.01)</code>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-filter font-bold">📈 Pearson Correlation:</span>
+                            <p class="text-xs text-gray-400 mt-1">Measures linear relationship with target. Good for linear models.</p>
+                            <code class="text-[10px] text-accent">corr = df.corr()['target'].abs().sort_values(ascending=False)</code>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-filter font-bold">🎯 ANOVA F-test:</span>
+                            <p class="text-xs text-gray-400 mt-1">Compares means across groups. Best for categorical target, continuous features.</p>
+                            <code class="text-[10px] text-accent">selector = SelectKBest(score_func=f_classif, k=10)</code>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-filter font-bold">💡 Mutual Information:</span>
+                            <p class="text-xs text-gray-400 mt-1">Captures any relationship (linear/non-linear). Most powerful filter method.</p>
+                            <code class="text-[10px] text-accent">mi = mutual_info_classif(X, y)</code>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-filter mb-3">✅ Advantages of Filter Methods:</p>
+                    <ul class="text-xs text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Very fast and scalable to high dimensions</li>
+                        <li>Independent of model choice</li>
+                        <li>Excellent for initial feature screening</li>
+                        <li>Good statistical foundation</li>
+                    </ul>
+                    <div class="mt-4 p-3 bg-filter/10 rounded">
+                        <p class="text-xs"><span class="text-filter">⚠️ Limitation:</span> Ignores feature interactions and model bias</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Wrapper Methods -->
+        <section id="wrapper" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="package" class="text-wrapper"></i>
+                <h2 class="text-2xl font-bold font-mono">Wrapper Methods: Model-Based Selection</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-wrapper font-bold">🔄 Recursive Feature Elimination (RFE):</span>
+                            <p class="text-xs text-gray-400 mt-1">Recursively removes least important features based on model coefficients.</p>
+                            <code class="text-[10px] text-accent">rfe = RFE(estimator=LogisticRegression(), n_features_to_select=5)</code>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-wrapper font-bold">⬆️ Forward Selection:</span>
+                            <p class="text-xs text-gray-400 mt-1">Start with empty set, iteratively add best performing feature.</p>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-wrapper font-bold">⬇️ Backward Elimination:</span>
+                            <p class="text-xs text-gray-400 mt-1">Start with all features, iteratively remove worst performing.</p>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-wrapper font-bold">🔁 Bidirectional (Stepwise):</span>
+                            <p class="text-xs text-gray-400 mt-1">Combine forward and backward selection.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-wrapper mb-3">✅ Advantages of Wrapper Methods:</p>
+                    <ul class="text-xs text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Model-aware — finds features optimized for specific algorithm</li>
+                        <li>Considers feature interactions</li>
+                        <li>Often yields better performance than filters</li>
+                    </ul>
+                    <div class="mt-4 p-3 bg-wrapper/10 rounded">
+                        <p class="text-xs"><span class="text-wrapper">⚠️ Limitation:</span> Computationally expensive (O(n²) to O(2ⁿ))</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Embedded Methods -->
+        <section id="embedded" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code" class="text-embedded"></i>
+                <h2 class="text-2xl font-bold font-mono">Embedded Methods: Built-in Feature Selection</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-embedded font-bold">📉 Lasso Regression (L1):</span>
+                            <p class="text-xs text-gray-400 mt-1">Pushes coefficients to zero → automatic feature selection.</p>
+                            <code class="text-[10px] text-accent">from sklearn.linear_model import Lasso</code>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-embedded font-bold">🌲 Tree-based Importance:</span>
+                            <p class="text-xs text-gray-400 mt-1">Random Forest, XGBoost, LightGBM provide feature importance scores.</p>
+                            <code class="text-[10px] text-accent">rf.feature_importances_</code>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-embedded font-bold">⚡ Elastic Net:</span>
+                            <p class="text-xs text-gray-400 mt-1">Combines L1 (Lasso) and L2 (Ridge) regularization.</p>
+                            <code class="text-[10px] text-accent">from sklearn.linear_model import ElasticNet</code>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-embedded mb-3">✅ Advantages of Embedded Methods:</p>
+                    <ul class="text-xs text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Computationally efficient (between filter and wrapper)</li>
+                        <li>Model-aware with feature interactions</li>
+                        <li>Built-in regularization prevents overfitting</li>
+                    </ul>
+                    <div class="mt-4 p-3 bg-embedded/10 rounded">
+                        <p class="text-xs"><span class="text-embedded">💡 Best for:</span> High-dimensional data, when you need fast and reliable selection</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Hybrid & Advanced Techniques -->
+        <section id="hybrid" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="git-merge" class="text-hybrid"></i>
+                <h2 class="text-2xl font-bold font-mono">Hybrid & Advanced Techniques</h2>
+            </div>
+            <div class="grid md:grid-cols-3 gap-5">
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <i data-lucide="trending-up" class="text-hybrid w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-hybrid">Boruta Algorithm</h3>
+                    <p class="text-xs text-gray-400 mt-1">Compares original features with randomized shadow features to determine importance.</p>
+                    <code class="text-[10px] text-accent block mt-2">from boruta import BorutaPy</code>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <i data-lucide="shuffle" class="text-accent w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-accent">Permutation Importance</h3>
+                    <p class="text-xs text-gray-400 mt-1">Measures drop in model performance when a feature's values are randomly shuffled.</p>
+                    <code class="text-[10px] text-accent block mt-2">from sklearn.inspection import permutation_importance</code>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <i data-lucide="layers" class="text-primary w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-primary">Auto-Feature Selection</h3>
+                    <p class="text-xs text-gray-400 mt-1">Automated selection using validation curves and cross-validation.</p>
+                    <code class="text-[10px] text-accent block mt-2">from sklearn.feature_selection import SelectFromModel</code>
+                </div>
+            </div>
+            <!-- Boruta Formula -->
+            <div class="bg-gradient-to-r from-hybrid/10 to-transparent rounded-xl p-4 border-l-4 border-hybrid">
+                <p class="text-sm font-mono text-center">Boruta: <span class="text-accent">Feature is important if its Z-score > max(Z_score of shadow features)</span></p>
+            </div>
+        </section>
+
+        <!-- Comprehensive Comparison Table -->
+        <section id="comparison" class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="table" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Method Comparison: Which One to Choose?</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-xs font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-3 py-2">Method</th><th class="px-3 py-2">Speed</th><th class="px-3 py-2">Accuracy</th><th class="px-3 py-2">Scalability</th><th class="px-3 py-2">Feature Interactions</th><th class="px-3 py-2">Best For</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr class="hover:bg-filter/5"><td class="px-3 py-2 text-filter font-bold">Filter</td><td class="text-accent">⭐⭐⭐⭐⭐</td><td class="text-yellow-400">⭐⭐⭐</td><td class="text-accent">⭐⭐⭐⭐⭐</td><td class="text-red-400">❌</td><td class="text-gray-400">Initial screening, high-dim</td></tr>
+                        <tr class="hover:bg-wrapper/5"><td class="px-3 py-2 text-wrapper font-bold">Wrapper</td><td class="text-red-400">⭐⭐</td><td class="text-accent">⭐⭐⭐⭐⭐</td><td class="text-red-400">⭐⭐</td><td class="text-accent">✅</td><td class="text-gray-400">Small feature sets, peak accuracy</td></tr>
+                        <tr class="hover:bg-embedded/5"><td class="px-3 py-2 text-embedded font-bold">Embedded</td><td class="text-accent">⭐⭐⭐⭐</td><td class="text-accent">⭐⭐⭐⭐⭐</td><td class="text-accent">⭐⭐⭐⭐</td><td class="text-accent">✅</td><td class="text-gray-400">Best balance, general use</td></tr>
+                        <tr class="hover:bg-hybrid/5"><td class="px-3 py-2 text-hybrid font-bold">Hybrid</td><td class="text-yellow-400">⭐⭐⭐</td><td class="text-accent">⭐⭐⭐⭐⭐</td><td class="text-yellow-400">⭐⭐⭐</td><td class="text-accent">✅</td><td class="text-gray-400">Maximum accuracy, research</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Practical Tips & Best Practices -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-filter/10 via-wrapper/5 to-embedded/10 rounded-xl p-6 border border-gray-700">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="lightbulb" class="text-accent w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-primary text-lg mb-3">💡 Practical Feature Selection Workflow</h3>
+                        <div class="grid md:grid-cols-2 gap-3 text-sm">
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">1.</span> Remove constant/quasi-constant features (Variance Threshold)</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">2.</span> Remove highly correlated features (correlation > 0.95)</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">3.</span> Apply Mutual Information/ANOVA to rank remaining</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">4.</span> Use RFE or SelectFromModel for final selection</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">5.</span> Validate with cross-validation and permutation importance</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">6.</span> Iterate and refine based on model performance</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Complete Code Implementation -->
+        <section id="code" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code-2" class="text-filter"></i>
+                <h2 class="text-2xl font-bold font-mono">Complete Implementation: All Methods in Action</h2>
+            </div>
+            <div class="bg-black rounded-xl border border-gray-800 overflow-hidden">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2 font-mono text-sm">
+                    <i data-lucide="python" class="w-4 h-4 text-filter"></i>
+                    <span class="text-gray-300">advanced_feature_selection.py</span>
+                </div>
+                <div class="p-5 overflow-x-auto">
+                    <pre class="text-sm font-mono text-gray-200 whitespace-pre-wrap"><code><span class="text-blue-400">import</span> pandas <span class="text-blue-400">as</span> pd
+<span class="text-blue-400">import</span> numpy <span class="text-blue-400">as</span> np
+<span class="text-blue-400">from</span> sklearn.datasets <span class="text-blue-400">import</span> load_breast_cancer
+<span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> train_test_split, cross_val_score
+<span class="text-blue-400">from</span> sklearn.ensemble <span class="text-blue-400">import</span> RandomForestClassifier
+<span class="text-blue-400">from</span> sklearn.feature_selection <span class="text-blue-400">import</span> (
+    VarianceThreshold, SelectKBest, f_classif, mutual_info_classif,
+    RFE, SelectFromModel, RFECV
+)
+<span class="text-blue-400">from</span> sklearn.linear_model <span class="text-blue-400">import</span> LassoCV, LogisticRegression
+<span class="text-blue-400">from</span> sklearn.preprocessing <span class="text-blue-400">import</span> StandardScaler
+
+<span class="text-green-500"># Load dataset</span>
+data = load_breast_cancer()
+X = pd.DataFrame(data.data, columns=data.feature_names)
+y = data.target
+
+<span class="text-green-500"># Scale features (important for Lasso, RFE)</span>
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Original shape: {X.shape}"</span>)
+
+<span class="text-green-500"># ========== 1. FILTER METHODS ==========</span>
+<span class="text-green-500"># Variance Threshold (remove constant features)</span>
+selector_var = VarianceThreshold(threshold=0.01)
+X_var = selector_var.fit_transform(X)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"After Variance Threshold: {X_var.shape[1]} features"</span>)
+
+<span class="text-green-500"># Mutual Information (best filter)</span>
+mi_scores = mutual_info_classif(X, y)
+mi_selected = np.argsort(mi_scores)[-10:]  <span class="text-green-500"># Top 10</span>
+
+<span class="text-green-500"># ========== 2. WRAPPER METHODS ==========</span>
+<span class="text-green-500"># RFECV (Recursive Feature Elimination with CV - automatic k selection)</span>
+estimator = LogisticRegression(max_iter=1000, random_state=42)
+selector_rfecv = RFECV(estimator, step=1, cv=5, scoring='accuracy')
+selector_rfecv.fit(X_scaled, y)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"RFECV optimal features: {selector_rfecv.n_features_}"</span>)
+
+<span class="text-green-500"># ========== 3. EMBEDDED METHODS ==========</span>
+<span class="text-green-500"># Lasso (L1 regularization)</span>
+lasso = LassoCV(cv=5, random_state=42, max_iter=10000)
+lasso.fit(X_scaled, y)
+lasso_selected = np.where(lasso.coef_ != 0)[0]
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Lasso selected: {len(lasso_selected)} features"</span>)
+
+<span class="text-green-500"># Random Forest Importance</span>
+rf = RandomForestClassifier(n_estimators=100, random_state=42)
+rf.fit(X, y)
+importance_df = pd.DataFrame({
+    <span class="text-green-400">'feature'</span>: X.columns,
+    <span class="text-green-400">'importance'</span>: rf.feature_importances_
+}).sort_values(<span class="text-green-400">'importance'</span>, ascending=False)
+rf_selected = importance_df.head(10)[<span class="text-green-400">'feature'</span>].tolist()
+
+<span class="text-green-500"># SelectFromModel (automated threshold)</span>
+selector_sfm = SelectFromModel(RandomForestClassifier(n_estimators=100), threshold=<span class="text-green-400">'median'</span>)
+selector_sfm.fit(X, y)
+X_sfm = selector_sfm.transform(X)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"SelectFromModel selected: {X_sfm.shape[1]} features"</span>)
+
+<span class="text-green-500"># ========== 4. COMPARE PERFORMANCE ==========</span>
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
+
+<span class="text-green-500"># Baseline: All features</span>
+rf_full = RandomForestClassifier(random_state=42)
+scores_full = cross_val_score(rf_full, X_train, y_train, cv=5)
+
+<span class="text-green-500"># Using top RF features</span>
+X_train_selected = X_train[rf_selected]
+rf_selected_model = RandomForestClassifier(random_state=42)
+scores_selected = cross_val_score(rf_selected_model, X_train_selected, y_train, cv=5)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"All features CV score: {scores_full.mean():.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Selected features CV score: {scores_selected.mean():.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Top 10 features: {rf_selected[:5]}..."</span>)</code></pre>
+                </div>
+                <div class="bg-dark/60 px-5 py-3 border-t border-gray-800 font-mono text-xs text-gray-300 flex justify-between">
+                    <span>📊 Output: Original: 30 features → RFECV: 12 optimal → Lasso: 8 features → Accuracy maintained/improved!</span>
+                    <i data-lucide="check-circle" class="text-accent w-4 h-4"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- When to Use Each Method -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="compass" class="text-secondary"></i>
+                <h2 class="text-2xl font-bold font-mono">Decision Guide: Which Method Should You Use?</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-5">
+                <div class="bg-dark p-4 rounded-lg">
+                    <p class="font-bold text-filter">📊 Use FILTER when:</p>
+                    <ul class="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        <li>You have hundreds/thousands of features</li>
+                        <li>Need quick initial screening</li>
+                        <li>Features are independent</li>
+                        <li>Computational resources are limited</li>
+                    </ul>
+                </div>
+                <div class="bg-dark p-4 rounded-lg">
+                    <p class="font-bold text-wrapper">🎯 Use WRAPPER when:</p>
+                    <ul class="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        <li>Feature set is small (&lt;50 features)</li>
+                        <li>Maximum predictive performance is critical</li>
+                        <li>Feature interactions are important</li>
+                        <li>You have a specific model in mind</li>
+                    </ul>
+                </div>
+                <div class="bg-dark p-4 rounded-lg">
+                    <p class="font-bold text-embedded">⚡ Use EMBEDDED when:</p>
+                    <ul class="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        <li>You need a balance of speed and accuracy</li>
+                        <li>Using tree-based models or regularized linear models</li>
+                        <li>Feature set is medium (50-500 features)</li>
+                        <li>Want built-in regularization</li>
+                    </ul>
+                </div>
+                <div class="bg-dark p-4 rounded-lg">
+                    <p class="font-bold text-hybrid">🔬 Use HYBRID when:</p>
+                    <ul class="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        <li>Research/competition setting</li>
+                        <li>Need maximum robustness</li>
+                        <li>Can afford computational cost</li>
+                        <li>Want to validate with multiple methods</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pitfalls to Avoid -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-red-900/20 to-transparent p-5 rounded-xl border border-red-800/40">
+                <div class="flex items-start gap-3">
+                    <i data-lucide="alert-triangle" class="text-red-400 w-6 h-6 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-red-400 mb-2">⚠️ Common Pitfalls in Feature Selection</h3>
+                        <div class="grid md:grid-cols-2 gap-2 text-xs">
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Selecting features on entire dataset (data leakage!)</div>
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Using only one method without validation</div>
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Ignoring domain knowledge</div>
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Not scaling features for Lasso/RFE</div>
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Over-optimizing feature count</div>
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Forgetting to apply selection to test data</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal Summary -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-black rounded-xl border border-gray-800 shadow-2xl overflow-hidden font-mono text-sm">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-gray-400 text-xs">feature@mastery:~/day15</span>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div><span class="text-green-400 font-bold">$</span> cat advanced_feature_selection_summary.md</div>
+                    <div class="text-gray-300 space-y-2 border-l-2 border-gray-800 pl-4">
+                        <p># 🎯 Day 15: Advanced Feature Selection — Complete Mastery</p>
+                        <ul class="list-disc ml-5 space-y-1 text-xs md:text-sm">
+                            <li>✅ <span class="text-filter">Filter Methods:</span> VarianceThreshold, Mutual Information, ANOVA, Pearson</li>
+                            <li>✅ <span class="text-wrapper">Wrapper Methods:</span> RFE, RFECV, Forward/Backward Selection</li>
+                            <li>✅ <span class="text-embedded">Embedded Methods:</span> Lasso (L1), Random Forest Importance, Elastic Net</li>
+                            <li>✅ <span class="text-hybrid">Hybrid/Advanced:</span> Boruta, Permutation Importance, SelectFromModel</li>
+                            <li>✅ <span class="text-accent">Workflow:</span> Filter → Remove correlated → Wrapper/Embedded → Validate</li>
+                            <li>✅ <span class="text-primary">Key Insight:</span> No single best method — combine approaches!</li>
+                        </ul>
+                        <p class="text-gray-500 mt-3">📌 Takeaway: Feature selection is as important as model selection. A simpler model with good features beats a complex model with noise!</p>
+                    </div>
+                    <div><span class="text-green-400 font-bold">$</span> <span class="typing-cursor text-filter"></span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 15 · Advanced Feature Selection · Filter, Wrapper, Embedded, Hybrid & Best Practices</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const textSequence = "Advanced feature selection loaded. Filter, wrapper, embedded, hybrid techniques ready...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day15&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+                          </html>
