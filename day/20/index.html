@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 20: Classification Evaluation Metrics · Confusion Matrix · ROC-AUC</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        tp: '#22C55E',
+                        tn: '#06B6D4',
+                        fp: '#EF4444',
+                        fn: '#F59E0B',
+                        roc: '#EC4899',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #22C55E;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #22C55E, #EC4899);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .metric-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(34,197,94,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .code-block {
+            background: #0A0A0A;
+            border-radius: 0.5rem;
+            border: 1px solid #262626;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+        }
+
+        .confusion-matrix {
+            display: grid;
+            grid-template-columns: auto repeat(2, 1fr);
+            gap: 2px;
+            background: #1a1a1a;
+            padding: 4px;
+            border-radius: 8px;
+        }
+        .cm-cell {
+            padding: 12px 16px;
+            text-align: center;
+            background: #0A0A0A;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+        .cm-cell.tp { background: rgba(34,197,94,0.25); color: #22C55E; }
+        .cm-cell.tn { background: rgba(6,182,212,0.25); color: #06B6D4; }
+        .cm-cell.fp { background: rgba(239,68,68,0.25); color: #EF4444; }
+        .cm-cell.fn { background: rgba(245,158,11,0.25); color: #F59E0B; }
+        .cm-header { background: #1a1a1a; font-weight: bold; color: #9CA3AF; }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-tp selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-tp font-mono font-bold text-xl">
+                    <i data-lucide="gauge"></i>
+                    <span>Classification_Metrics.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#confusion" class="hover:text-tp transition-colors">Confusion Matrix</a>
+                        <a href="#metrics" class="hover:text-primary transition-colors">Key Metrics</a>
+                        <a href="#roc" class="hover:text-roc transition-colors">ROC-AUC</a>
+                        <a href="#when" class="hover:text-accent transition-colors">When to Use</a>
+                        <a href="#code" class="hover:text-secondary transition-colors">Implementation</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="target" class="w-32 h-32 text-tp"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [20]: Classification Metrics · Day 20</div>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-tp to-roc">
+                        Classification Evaluation Metrics
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    Loading classification evaluation metrics...
+                </p>
+            </div>
+        </section>
+
+        <!-- Confusion Matrix -->
+        <section id="confusion" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="grid" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Confusion Matrix: The Foundation</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <p class="text-gray-300 text-sm mb-4">The <span class="text-primary font-bold">Confusion Matrix</span> is a table that summarizes the performance of a classification model.</p>
+                    <div class="confusion-matrix max-w-sm">
+                        <div class="cm-cell cm-header"></div>
+                        <div class="cm-cell cm-header">Predicted: NO</div>
+                        <div class="cm-cell cm-header">Predicted: YES</div>
+                        <div class="cm-cell cm-header">Actual: NO</div>
+                        <div class="cm-cell tn">TN ✓</div>
+                        <div class="cm-cell fp">FP ✗</div>
+                        <div class="cm-cell cm-header">Actual: YES</div>
+                        <div class="cm-cell fn">FN ✗</div>
+                        <div class="cm-cell tp">TP ✓</div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
+                        <div><span class="text-tp font-bold">TP:</span> True Positive (correctly predicted positive)</div>
+                        <div><span class="text-tn font-bold">TN:</span> True Negative (correctly predicted negative)</div>
+                        <div><span class="text-fp font-bold">FP:</span> False Positive (Type I error)</div>
+                        <div><span class="text-fn font-bold">FN:</span> False Negative (Type II error)</div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-primary mb-3">📊 Example: Medical Test</p>
+                    <div class="confusion-matrix max-w-xs">
+                        <div class="cm-cell cm-header"></div>
+                        <div class="cm-cell cm-header">Pred: Healthy</div>
+                        <div class="cm-cell cm-header">Pred: Sick</div>
+                        <div class="cm-cell cm-header">Actual: Healthy</div>
+                        <div class="cm-cell tn">90</div>
+                        <div class="cm-cell fp">5</div>
+                        <div class="cm-cell cm-header">Actual: Sick</div>
+                        <div class="cm-cell fn">3</div>
+                        <div class="cm-cell tp">2</div>
+                    </div>
+                    <div class="mt-3 text-xs text-gray-400">
+                        <p>✅ TP = 2 (correctly diagnosed sick)</p>
+                        <p>✅ TN = 90 (correctly diagnosed healthy)</p>
+                        <p>⚠️ FP = 5 (false alarm - healthy diagnosed sick)</p>
+                        <p>⚠️ FN = 3 (missed diagnosis - sick diagnosed healthy)</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Key Metrics -->
+        <section id="metrics" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="calculator" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Key Classification Metrics</h2>
+            </div>
+            <div class="grid md:grid-cols-3 gap-5">
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 metric-card">
+                    <h3 class="font-bold text-primary text-lg">Accuracy</h3>
+                    <div class="bg-dark p-2 rounded mt-2 text-center font-mono text-sm">(TP + TN) / (TP + TN + FP + FN)</div>
+                    <p class="text-xs text-gray-400 mt-2">When to use: Balanced classes, all errors equally important.</p>
+                    <div class="mt-2 p-2 bg-primary/10 rounded">
+                        <p class="text-[10px] text-gray-400">⚠️ Misleading for imbalanced data!</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 metric-card">
+                    <h3 class="font-bold text-tp text-lg">Precision</h3>
+                    <div class="bg-dark p-2 rounded mt-2 text-center font-mono text-sm">TP / (TP + FP)</div>
+                    <p class="text-xs text-gray-400 mt-2">When to use: Minimize false positives (spam detection).</p>
+                    <div class="mt-2 p-2 bg-tp/10 rounded">
+                        <p class="text-[10px] text-gray-400">"Of all predicted positive, how many were correct?"</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 metric-card">
+                    <h3 class="font-bold text-tn text-lg">Recall (Sensitivity)</h3>
+                    <div class="bg-dark p-2 rounded mt-2 text-center font-mono text-sm">TP / (TP + FN)</div>
+                    <p class="text-xs text-gray-400 mt-2">When to use: Minimize false negatives (medical diagnosis).</p>
+                    <div class="mt-2 p-2 bg-tn/10 rounded">
+                        <p class="text-[10px] text-gray-400">"Of all actual positives, how many were found?"</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 metric-card">
+                    <h3 class="font-bold text-fn text-lg">Specificity</h3>
+                    <div class="bg-dark p-2 rounded mt-2 text-center font-mono text-sm">TN / (TN + FP)</div>
+                    <p class="text-xs text-gray-400 mt-2">When to use: Minimize false positives (facial recognition).</p>
+                    <div class="mt-2 p-2 bg-fn/10 rounded">
+                        <p class="text-[10px] text-gray-400">"Of all actual negatives, how many were correct?"</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 metric-card">
+                    <h3 class="font-bold text-roc text-lg">F1-Score</h3>
+                    <div class="bg-dark p-2 rounded mt-2 text-center font-mono text-sm">2 × (P × R) / (P + R)</div>
+                    <p class="text-xs text-gray-400 mt-2">When to use: Balance between precision and recall.</p>
+                    <div class="mt-2 p-2 bg-roc/10 rounded">
+                        <p class="text-[10px] text-gray-400">Harmonic mean of Precision & Recall</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 metric-card">
+                    <h3 class="font-bold text-secondary text-lg">Support</h3>
+                    <div class="bg-dark p-2 rounded mt-2 text-center font-mono text-sm">Number of actual occurrences</div>
+                    <p class="text-xs text-gray-400 mt-2">When to use: Understand class distribution in evaluation.</p>
+                    <div class="mt-2 p-2 bg-secondary/10 rounded">
+                        <p class="text-[10px] text-gray-400">"How many samples in each class?"</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Metrics Relationship -->
+            <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                <p class="text-center text-sm font-bold text-primary mb-2">📊 Metrics Relationship</p>
+                <div class="flex justify-around text-xs">
+                    <div class="text-center"><span class="text-tp">Precision</span><br/>↑ with fewer FP</div>
+                    <div class="text-center"><span class="text-tn">Recall</span><br/>↑ with fewer FN</div>
+                    <div class="text-center"><span class="text-roc">F1</span><br/>Balance of both</div>
+                    <div class="text-center"><span class="text-secondary">Accuracy</span><br/>Overall correctness</div>
+                </div>
+                <p class="text-center text-xs text-gray-500 mt-3">🔴 Trade-off: Increasing precision often decreases recall and vice versa</p>
+            </div>
+        </section>
+
+        <!-- ROC Curve and AUC -->
+        <section id="roc" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="chart-line" class="text-roc"></i>
+                <h2 class="text-2xl font-bold font-mono">ROC Curve & AUC Score</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3"><span class="text-roc font-bold">ROC (Receiver Operating Characteristic)</span> curve plots <span class="text-accent">TPR (Recall)</span> vs <span class="text-fp">FPR (Fall-out)</span> at various thresholds.</p>
+                    <div class="code-block p-4">
+                        <pre class="text-xs"><code><span class="text-blue-400">from</span> sklearn.metrics <span class="text-blue-400">import</span> roc_curve, roc_auc_score
+
+y_probs = model.predict_proba(X_test)[:, 1]
+fpr, tpr, thresholds = roc_curve(y_test, y_probs)
+auc = roc_auc_score(y_test, y_probs)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"AUC: {auc:.4f}"</span>)</code></pre>
+                    </div>
+                    <div class="mt-3 p-3 bg-roc/10 rounded-lg">
+                        <p class="text-xs"><span class="text-roc font-bold">AUC Interpretation:</span></p>
+                        <ul class="text-xs text-gray-300 list-disc list-inside mt-1">
+                            <li>AUC = 1.0 → Perfect classifier</li>
+                            <li>AUC = 0.9-1.0 → Excellent</li>
+                            <li>AUC = 0.8-0.9 → Good</li>
+                            <li>AUC = 0.7-0.8 → Fair</li>
+                            <li>AUC = 0.5 → Random guess</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-roc mb-3">📈 ROC Curve Visualization</p>
+                    <div class="relative w-full h-48 bg-black rounded-lg border border-gray-700">
+                        <svg viewBox="0 0 300 180" class="w-full h-full">
+                            <!-- Axes -->
+                            <line x1="30" y1="150" x2="280" y2="150" stroke="#4B5563" stroke-width="1.2"/>
+                            <line x1="30" y1="150" x2="30" y2="15" stroke="#4B5563" stroke-width="1.2"/>
+                            <!-- Diagonal (random) -->
+                            <line x1="30" y1="150" x2="280" y2="15" stroke="#6B7280" stroke-width="1" stroke-dasharray="4"/>
+                            <!-- ROC Curve -->
+                            <path d="M30,150 Q80,145 130,100 Q180,55 200,30 T280,15" stroke="#EC4899" stroke-width="2.5" fill="none"/>
+                            <!-- Points -->
+                            <text x="145" y="85" fill="#EC4899" font-size="8">AUC = 0.92</text>
+                            <text x="250" y="145" fill="#9CA3AF" font-size="7">FPR (1-Specificity) →</text>
+                            <text x="15" y="85" fill="#9CA3AF" font-size="7" transform="rotate(-90,15,85)">TPR (Recall) →</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- When to Use Which Metric -->
+        <section id="when" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="compass" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">When to Use Which Metric?</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-5">
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="font-bold text-tp">✅ Use Accuracy when:</p>
+                    <ul class="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        <li>Classes are balanced</li>
+                        <li>All errors are equally costly</li>
+                        <li>Baseline comparison needed</li>
+                    </ul>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="font-bold text-tp">✅ Use Precision when:</p>
+                    <ul class="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        <li>False positives are costly (spam detection)</li>
+                        <li>You want to minimize "false alarms"</li>
+                    </ul>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="font-bold text-tn">✅ Use Recall when:</p>
+                    <ul class="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        <li>False negatives are costly (medical diagnosis)</li>
+                        <li>You want to catch all positives</li>
+                    </ul>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="font-bold text-roc">✅ Use F1-Score when:</p>
+                    <ul class="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        <li>Imbalanced classes</li>
+                        <li>Need balance between precision and recall</li>
+                        <li>No clear preference for FP vs FN</li>
+                    </ul>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="font-bold text-secondary">✅ Use ROC-AUC when:</p>
+                    <ul class="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        <li>Comparing model performance</li>
+                        <li>Threshold-independent evaluation</li>
+                        <li>Model ranking capability matters</li>
+                    </ul>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="font-bold text-primary">✅ Use Classification Report when:</p>
+                    <ul class="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        <li>You want a complete picture</li>
+                        <li>Multiple metrics at once</li>
+                        <li>Per-class performance needed</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Complete Implementation -->
+        <section id="code" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code-2" class="text-tp"></i>
+                <h2 class="text-2xl font-bold font-mono">Complete Implementation: All Metrics</h2>
+            </div>
+            <div class="bg-black rounded-xl border border-gray-800 overflow-hidden">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2 font-mono text-sm">
+                    <i data-lucide="python" class="w-4 h-4 text-tp"></i>
+                    <span class="text-gray-300">classification_metrics_demo.py</span>
+                </div>
+                <div class="p-5 overflow-x-auto">
+                    <pre class="text-sm font-mono text-gray-200 whitespace-pre-wrap"><code><span class="text-blue-400">import</span> numpy <span class="text-blue-400">as</span> np
+<span class="text-blue-400">import</span> pandas <span class="text-blue-400">as</span> pd
+<span class="text-blue-400">from</span> sklearn.datasets <span class="text-blue-400">import</span> make_classification, load_breast_cancer
+<span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> train_test_split, cross_val_score
+<span class="text-blue-400">from</span> sklearn.linear_model <span class="text-blue-400">import</span> LogisticRegression
+<span class="text-blue-400">from</span> sklearn.ensemble <span class="text-blue-400">import</span> RandomForestClassifier
+<span class="text-blue-400">from</span> sklearn.metrics <span class="text-blue-400">import</span> (
+    confusion_matrix, accuracy_score, precision_score, recall_score,
+    f1_score, roc_auc_score, roc_curve, precision_recall_curve,
+    classification_report, ConfusionMatrixDisplay, RocCurveDisplay
+)
+<span class="text-blue-400">from</span> sklearn.preprocessing <span class="text-blue-400">import</span> StandardScaler
+<span class="text-blue-400">import</span> matplotlib.pyplot <span class="text-blue-400">as</span> plt
+
+<span class="text-green-500"># ========== 1. GENERATE IMBALANCED DATASET ==========</span>
+X, y = make_classification(
+    n_samples=10000,
+    n_features=20,
+    n_informative=15,
+    n_redundant=3,
+    n_clusters_per_class=1,
+    weights=[0.85, 0.15],  <span class="text-green-500"># 85% majority, 15% minority</span>
+    random_state=42
+)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Training: {np.bincount(y_train)}, Test: {np.bincount(y_test)}"</span>)
+
+<span class="text-green-500"># ========== 2. TRAIN MODEL ==========</span>
+model = RandomForestClassifier(random_state=42, n_estimators=100)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+y_probs = model.predict_proba(X_test)[:, 1]
+
+<span class="text-green-500"># ========== 3. CONFUSION MATRIX ==========</span>
+cm = confusion_matrix(y_test, y_pred)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Confusion Matrix:"</span>)
+<span class="text-yellow-400">print</span>(cm)
+
+tn, fp, fn, tp = cm.ravel()
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"TP: {tp}, TN: {tn}, FP: {fp}, FN: {fn}"</span>)
+
+<span class="text-green-500"># ========== 4. CALCULATE ALL METRICS ==========</span>
+metrics = {
+    <span class="text-green-400">'Accuracy'</span>: accuracy_score(y_test, y_pred),
+    <span class="text-green-400">'Precision'</span>: precision_score(y_test, y_pred),
+    <span class="text-green-400">'Recall'</span>: recall_score(y_test, y_pred),
+    <span class="text-green-400">'F1-Score'</span>: f1_score(y_test, y_pred),
+    <span class="text-green-400">'ROC-AUC'</span>: roc_auc_score(y_test, y_probs),
+    <span class="text-green-400">'Specificity'</span>: tn / (tn + fp),
+    <span class="text-green-400">'FPR'</span>: fp / (fp + tn),
+    <span class="text-green-400">'FNR'</span>: fn / (fn + tp)
+}
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📈 Classification Metrics:"</span>)
+<span class="text-blue-400">for</span> name, value <span class="text-blue-400">in</span> metrics.items():
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  {name:12s}: {value:.4f}"</span>)
+
+<span class="text-green-500"># ========== 5. CLASSIFICATION REPORT ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Classification Report:"</span>)
+<span class="text-yellow-400">print</span>(classification_report(y_test, y_pred, target_names=[<span class="text-green-400">'Class 0'</span>, <span class="text-green-400">'Class 1'</span>]))
+
+<span class="text-green-500"># ========== 6. ROC & PR CURVES ==========</span>
+fpr, tpr, thresholds = roc_curve(y_test, y_probs)
+precision_curve, recall_curve, _ = precision_recall_curve(y_test, y_probs)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n📈 ROC-AUC: {roc_auc_score(y_test, y_probs):.4f}"</span>)
+
+<span class="text-green-500"># ========== 7. THRESHOLD TUNING ==========</span>
+thresholds_to_try = np.arange(0.1, 0.9, 0.05)
+best_f1 = 0
+best_threshold = 0.5
+best_precision = 0
+best_recall = 0
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Threshold Tuning Results:"</span>)
+<span class="text-blue-400">for</span> thresh <span class="text-blue-400">in</span> thresholds_to_try:
+    preds = (y_probs >= thresh).astype(int)
+    p = precision_score(y_test, preds, zero_division=0)
+    r = recall_score(y_test, preds, zero_division=0)
+    f1 = f1_score(y_test, preds, zero_division=0)
+    <span class="text-blue-400">if</span> f1 > best_f1:
+        best_f1 = f1
+        best_threshold = thresh
+        best_precision = p
+        best_recall = r
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Best threshold: {best_threshold:.2f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  → F1: {best_f1:.4f}, Precision: {best_precision:.4f}, Recall: {best_recall:.4f}"</span>)
+
+<span class="text-green-500"># ========== 8. CROSS-VALIDATION METRICS ==========</span>
+cv_scores_accuracy = cross_val_score(model, X, y, cv=5, scoring='accuracy')
+cv_scores_f1 = cross_val_score(model, X, y, cv=5, scoring='f1_macro')
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n📊 5-Fold CV:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Accuracy: {cv_scores_accuracy.mean():.4f} ± {cv_scores_accuracy.std():.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  F1-Macro: {cv_scores_f1.mean():.4f} ± {cv_scores_f1.std():.4f}"</span>)
+
+<span class="text-green-500"># ========== 9. MULTI-CLASS EXAMPLE ==========</span>
+<span class="text-blue-400">from</span> sklearn.datasets <span class="text-blue-400">import</span> load_iris
+iris = load_iris()
+X_iris, y_iris = iris.data, iris.target
+X_train, X_test, y_train, y_test = train_test_split(X_iris, y_iris, test_size=0.2, random_state=42)
+
+model_multi = RandomForestClassifier(random_state=42, n_estimators=50)
+model_multi.fit(X_train, y_train)
+y_pred_multi = model_multi.predict(X_test)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Multi-Class Classification Report:"</span>)
+<span class="text-yellow-400">print</span>(classification_report(y_test, y_pred_multi, target_names=iris.target_names))
+
+<span class="text-green-500"># ========== 10. METRICS SUMMARY ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📌 When to use each metric:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Accuracy: Balanced classes, simple interpretation"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Precision: Minimize false positives (spam, alerts)"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Recall: Minimize false negatives (medical, fraud)"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ F1-Score: Imbalanced classes, balanced FP/FN"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ ROC-AUC: Model comparison, threshold-independent"</span>)</code></pre>
+                </div>
+                <div class="bg-dark/60 px-5 py-3 border-t border-gray-800 font-mono text-xs text-gray-300 flex justify-between">
+                    <span>📊 Output: Accuracy: 0.87, F1: 0.78 | Best threshold: 0.35 | Classification report shows per-class metrics for multi-class</span>
+                    <i data-lucide="check-circle" class="text-accent w-4 h-4"></i>
+                </div>
+            </div>
+            <div class="bg-surface rounded-lg p-5 border-l-4 border-tp">
+                <p class="text-sm"><strong class="text-tp">💡 Key Insight:</strong> Never use <span class="text-red-400">accuracy</span> alone on imbalanced data! Always check <span class="text-accent">precision</span>, <span class="text-accent">recall</span>, and <span class="text-accent">F1-score</span>. For model comparison, <span class="text-roc">ROC-AUC</span> is threshold-independent and robust.</p>
+            </div>
+        </section>
+
+        <!-- Quick Reference Table -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="table" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Quick Reference: Metrics Comparison</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-xs font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-3 py-2 text-left">Metric</th><th class="px-3 py-2 text-left">Formula</th><th class="px-3 py-2 text-left">Best For</th><th class="px-3 py-2 text-left">Pros/Cons</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-3 py-2 text-primary">Accuracy</td><td class="px-3 py-2">(TP+TN)/Total</td><td class="px-3 py-2">Balanced classes</td><td class="px-3 py-2">Simple but misleading for imbalanced</td></tr>
+                        <tr><td class="px-3 py-2 text-tp">Precision</td><td class="px-3 py-2">TP/(TP+FP)</td><td class="px-3 py-2">Minimize FP</td><td class="px-3 py-2">Ignores FN</td></tr>
+                        <tr><td class="px-3 py-2 text-tn">Recall</td><td class="px-3 py-2">TP/(TP+FN)</td><td class="px-3 py-2">Minimize FN</td><td class="px-3 py-2">Ignores FP</td></tr>
+                        <tr><td class="px-3 py-2 text-roc">F1-Score</td><td class="px-3 py-2">2PR/(P+R)</td><td class="px-3 py-2">Imbalanced classes</td><td class="px-3 py-2">Harmonic mean, balances both</td></tr>
+                        <tr><td class="px-3 py-2 text-secondary">ROC-AUC</td><td class="px-3 py-2">Area under ROC</td><td class="px-3 py-2">Model comparison</td><td class="px-3 py-2">Threshold-independent</td></tr>
+                        <tr><td class="px-3 py-2 text-accent">Specificity</td><td class="px-3 py-2">TN/(TN+FP)</td><td class="px-3 py-2">Minimize FP</td><td class="px-3 py-2">Complement of recall</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Common Pitfalls -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-red-900/20 to-transparent p-5 rounded-xl border border-red-800/40">
+                <div class="flex items-start gap-3">
+                    <i data-lucide="alert-triangle" class="text-red-400 w-6 h-6 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-red-400 mb-2">⚠️ Common Pitfalls in Classification Evaluation</h3>
+                        <div class="grid md:grid-cols-2 gap-2 text-xs">
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Using accuracy on imbalanced data (misleading!)</div>
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Not looking at confusion matrix</div>
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Ignoring class-specific performance</div>
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Using only one metric</div>
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Not tuning classification threshold</div>
+                            <div class="flex items-center gap-2"><span class="text-red-400">→</span> Evaluating on same data used for tuning</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal Summary -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-black rounded-xl border border-gray-800 shadow-2xl overflow-hidden font-mono text-sm">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-gray-400 text-xs">metrics@classifier:~/day20</span>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div><span class="text-green-400 font-bold">$</span> cat classification_metrics_summary.md</div>
+                    <div class="text-gray-300 space-y-2 border-l-2 border-gray-800 pl-4">
+                        <p># 🎯 Day 20: Classification Evaluation Metrics</p>
+                        <ul class="list-disc ml-5 space-y-1 text-xs md:text-sm">
+                            <li>✅ <span class="text-primary">Confusion Matrix:</span> TP, TN, FP, FN — foundation of all metrics</li>
+                            <li>✅ <span class="text-primary">Accuracy:</span> Overall correctness (use only on balanced data)</li>
+                            <li>✅ <span class="text-tp">Precision:</span> TP/(TP+FP) — minimize false positives</li>
+                            <li>✅ <span class="text-tn">Recall:</span> TP/(TP+FN) — minimize false negatives</li>
+                            <li>✅ <span class="text-roc">F1-Score:</span> Harmonic mean of precision and recall (imbalanced data)</li>
+                            <li>✅ <span class="text-secondary">ROC-AUC:</span> Threshold-independent model comparison</li>
+                            <li>✅ <span class="text-accent">Rule:</span> Always check multiple metrics, never use accuracy alone!</li>
+                        </ul>
+                        <p class="text-gray-500 mt-3">📌 Pro Tip: For business problems, choose metrics aligned with costs. Medical diagnosis → Recall, Spam detection → Precision, Fraud detection → F1-Score.</p>
+                    </div>
+                    <div><span class="text-green-400 font-bold">$</span> <span class="typing-cursor text-tp"></span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 20 · Classification Evaluation Metrics · Confusion Matrix, Precision, Recall, F1, ROC-AUC</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const textSequence = "Classification metrics loaded. Confusion matrix, precision, recall, F1, ROC-AUC ready...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day20&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+</html>
