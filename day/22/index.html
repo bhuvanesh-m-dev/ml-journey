@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 22: Clustering · K-Means Clustering Algorithm</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        cluster: '#F59E0B',
+                        centroid: '#EF4444',
+                        kmeans: '#06B6D4',
+                        inertia: '#EC4899',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'move-centroid': 'moveCentroid 3s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                        moveCentroid: {
+                            '0%, 100%': { transform: 'translate(0px, 0px)' },
+                            '50%': { transform: 'translate(10px, -10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F59E0B;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #F59E0B, #06B6D4);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .cluster-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .cluster-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(245,158,11,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .code-block {
+            background: #0A0A0A;
+            border-radius: 0.5rem;
+            border: 1px solid #262626;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+        }
+
+        .cluster-visual {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            padding: 20px;
+            background: #0A0A0A;
+            border-radius: 12px;
+            border: 1px solid #262626;
+        }
+        .cluster-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .centroid-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 3px solid #EF4444;
+            display: inline-block;
+            position: relative;
+        }
+        .centroid-dot::after {
+            content: '★';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #EF4444;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-cluster selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-cluster font-mono font-bold text-xl">
+                    <i data-lucide="target"></i>
+                    <span>KMeans_Clustering.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#what-is" class="hover:text-cluster transition-colors">What is Clustering?</a>
+                        <a href="#kmeans" class="hover:text-kmeans transition-colors">K-Means</a>
+                        <a href="#algorithm" class="hover:text-primary transition-colors">Algorithm</a>
+                        <a href="#elbow" class="hover:text-inertia transition-colors">Elbow Method</a>
+                        <a href="#code" class="hover:text-accent transition-colors">Implementation</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="grid-3x3" class="w-32 h-32 text-cluster"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [22]: K-Means Clustering · Day 22</div>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-cluster to-kmeans">
+                        Clustering & K-Means Algorithm
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    Loading unsupervised learning - clustering algorithms...
+                </p>
+            </div>
+        </section>
+
+        <!-- What is Clustering? -->
+        <section id="what-is" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="users" class="text-cluster"></i>
+                <h2 class="text-2xl font-bold font-mono">What is Clustering?</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <p class="text-gray-300 text-sm mb-4"><span class="text-cluster font-bold">Clustering</span> is an unsupervised learning technique that groups similar data points together. It finds hidden patterns without predefined labels.</p>
+                    <div class="space-y-2">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-primary font-bold">🎯 Goal:</span>
+                            <p class="text-xs text-gray-400 mt-1">Group data points so that points in the same cluster are more similar to each other than to points in other clusters.</p>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-accent font-bold">📊 Real-World Applications:</span>
+                            <ul class="text-xs text-gray-300 list-disc list-inside mt-1">
+                                <li>Customer Segmentation (marketing)</li>
+                                <li>Image Segmentation (computer vision)</li>
+                                <li>Anomaly Detection (fraud detection)</li>
+                                <li>Document Clustering (NLP)</li>
+                                <li>Recommender Systems</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-cluster mb-3">📊 Types of Clustering</p>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex items-center gap-2"><span class="text-accent">●</span> <span class="font-bold text-primary">Partitioning:</span> K-Means, K-Medoids</div>
+                        <div class="flex items-center gap-2"><span class="text-accent">●</span> <span class="font-bold text-secondary">Hierarchical:</span> Agglomerative, Divisive</div>
+                        <div class="flex items-center gap-2"><span class="text-accent">●</span> <span class="font-bold text-cluster">Density-Based:</span> DBSCAN, OPTICS</div>
+                        <div class="flex items-center gap-2"><span class="text-accent">●</span> <span class="font-bold text-rmse">Model-Based:</span> Gaussian Mixture Models</div>
+                    </div>
+                    <div class="mt-3 p-2 bg-cluster/10 rounded">
+                        <p class="text-xs text-gray-400">💡 <span class="text-cluster">K-Means</span> is the most popular and widely used clustering algorithm!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- K-Means Clustering -->
+        <section id="kmeans" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="target" class="text-kmeans"></i>
+                <h2 class="text-2xl font-bold font-mono">K-Means Clustering: Core Concept</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3"><span class="text-kmeans font-bold">K-Means</span> partitions data into <span class="text-accent">K</span> clusters. Each cluster is represented by its <span class="text-centroid font-bold">centroid</span> (mean of all points in that cluster).</p>
+                    <div class="code-block p-4">
+                        <pre class="text-xs"><code><span class="text-blue-400">from</span> sklearn.cluster <span class="text-blue-400">import</span> KMeans
+
+kmeans = KMeans(n_clusters=3, random_state=42)
+labels = kmeans.fit_predict(X)
+centroids = kmeans.cluster_centers_</code></pre>
+                    </div>
+                    <div class="mt-3 p-3 bg-kmeans/10 rounded-lg">
+                        <p class="text-xs"><span class="text-kmeans font-bold">Objective:</span> Minimize within-cluster sum of squares (inertia)</p>
+                        <p class="text-xs font-mono text-center mt-1">\[
+                        J = \sum_{i=1}^{K} \sum_{x \in C_i} ||x - \mu_i||^2
+                        \]</p>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-kmeans mb-3">📊 Visual Representation</p>
+                    <div class="cluster-visual">
+                        <div>
+                            <div class="flex gap-2 mb-3">
+                                <span class="cluster-dot" style="background: #22C55E;"></span>
+                                <span class="cluster-dot" style="background: #22C55E;"></span>
+                                <span class="cluster-dot" style="background: #22C55E;"></span>
+                            </div>
+                            <div class="centroid-dot" style="border-color: #22C55E;"></div>
+                            <div class="text-[10px] text-green-400 mt-1">Centroid 1</div>
+                        </div>
+                        <div>
+                            <div class="flex gap-2 mb-3">
+                                <span class="cluster-dot" style="background: #EC4899;"></span>
+                                <span class="cluster-dot" style="background: #EC4899;"></span>
+                                <span class="cluster-dot" style="background: #EC4899;"></span>
+                            </div>
+                            <div class="centroid-dot" style="border-color: #EC4899;"></div>
+                            <div class="text-[10px] text-pink-400 mt-1">Centroid 2</div>
+                        </div>
+                        <div>
+                            <div class="flex gap-2 mb-3">
+                                <span class="cluster-dot" style="background: #F59E0B;"></span>
+                                <span class="cluster-dot" style="background: #F59E0B;"></span>
+                                <span class="cluster-dot" style="background: #F59E0B;"></span>
+                            </div>
+                            <div class="centroid-dot" style="border-color: #F59E0B;"></div>
+                            <div class="text-[10px] text-yellow-400 mt-1">Centroid 3</div>
+                        </div>
+                    </div>
+                    <p class="text-center text-xs text-gray-400 mt-3">Each point belongs to the nearest centroid</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- K-Means Algorithm Steps -->
+        <section id="algorithm" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="list-check" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">K-Means Algorithm: Step by Step</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-kmeans mb-3">🔄 The Algorithm:</p>
+                    <ol class="space-y-3 text-xs">
+                        <li class="flex items-start gap-2"><span class="text-accent font-bold">1.</span> <span class="text-gray-300">Initialize K centroids randomly (or with K-Means++)</span></li>
+                        <li class="flex items-start gap-2"><span class="text-accent font-bold">2.</span> <span class="text-gray-300">Assign each point to the nearest centroid (Euclidean distance)</span></li>
+                        <li class="flex items-start gap-2"><span class="text-accent font-bold">3.</span> <span class="text-gray-300">Recalculate centroids as the mean of assigned points</span></li>
+                        <li class="flex items-start gap-2"><span class="text-accent font-bold">4.</span> <span class="text-gray-300">Repeat steps 2-3 until convergence (centroids stop moving)</span></li>
+                    </ol>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-primary mb-3">📌 Key Concepts:</p>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between border-b border-gray-700 pb-1"><span class="text-cluster">Cluster:</span><span class="text-gray-300">Group of similar points</span></div>
+                        <div class="flex justify-between border-b border-gray-700 pb-1"><span class="text-centroid">Centroid:</span><span class="text-gray-300">Mean of points in cluster</span></div>
+                        <div class="flex justify-between border-b border-gray-700 pb-1"><span class="text-kmeans">Distance:</span><span class="text-gray-300">Euclidean distance (default)</span></div>
+                        <div class="flex justify-between border-b border-gray-700 pb-1"><span class="text-inertia">Inertia:</span><span class="text-gray-300">Within-cluster sum of squares</span></div>
+                        <div class="flex justify-between"><span class="text-accent">Convergence:</span><span class="text-gray-300">When inertia stops decreasing</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-r from-kmeans/10 to-primary/10 rounded-xl p-4 border-l-4 border-kmeans">
+                <p class="text-sm"><span class="text-kmeans font-bold">⚡ Time Complexity:</span> O(K × n × d × iterations) — K clusters, n samples, d dimensions, iterations until convergence</p>
+            </div>
+        </section>
+
+        <!-- Choosing K: Elbow Method -->
+        <section id="elbow" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="chart-line" class="text-inertia"></i>
+                <h2 class="text-2xl font-bold font-mono">Choosing K: Elbow Method & Silhouette Score</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3">The <span class="text-inertia font-bold">Elbow Method</span> plots inertia for different K values. The "elbow" point is the optimal K.</p>
+                    <div class="code-block p-4">
+                        <pre class="text-xs"><code><span class="text-blue-400">from</span> sklearn.cluster <span class="text-blue-400">import</span> KMeans
+
+inertias = []
+K_range = range(1, 11)
+<span class="text-blue-400">for</span> k <span class="text-blue-400">in</span> K_range:
+    kmeans = KMeans(n_clusters=k)
+    kmeans.fit(X)
+    inertias.append(kmeans.inertia_)
+
+<span class="text-green-500"># Elbow plot</span>
+plt.plot(K_range, inertias, 'bo-')
+plt.xlabel('K')
+plt.ylabel('Inertia')</code></pre>
+                    </div>
+                    <div class="mt-3 p-3 bg-inertia/10 rounded-lg">
+                        <p class="text-xs"><span class="text-inertia font-bold">Elbow Point:</span> Where inertia starts decreasing slowly</p>
+                        <p class="text-xs text-gray-400 mt-1">Alternative: <span class="text-accent">Silhouette Score</span> (higher = better clustering)</p>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-inertia mb-3">📊 Elbow Method Visualization</p>
+                    <div class="relative w-full h-48 bg-black rounded-lg border border-gray-700">
+                        <svg viewBox="0 0 300 170" class="w-full h-full">
+                            <rect width="300" height="170" fill="#0A0A0A" rx="6"/>
+                            <!-- Axes -->
+                            <line x1="30" y1="140" x2="280" y2="140" stroke="#4B5563" stroke-width="1"/>
+                            <line x1="30" y1="140" x2="30" y2="15" stroke="#4B5563" stroke-width="1"/>
+                            <!-- Elbow curve -->
+                            <path d="M40,130 Q80,110 120,85 Q160,55 200,30 T280,15" stroke="#EC4899" stroke-width="2.5" fill="none"/>
+                            <!-- Elbow point -->
+                            <circle cx="160" cy="55" r="5" fill="#F59E0B"/>
+                            <text x="160" y="50" text-anchor="middle" fill="#F59E0B" font-size="8">Elbow (K=3)</text>
+                            <text x="160" y="155" text-anchor="middle" fill="#9CA3AF" font-size="7">Number of Clusters (K) →</text>
+                            <text x="15" y="80" fill="#9CA3AF" font-size="7" transform="rotate(-90,15,80)">Inertia →</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- K-Means++ Initialization -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-kmeans/10 to-cluster/10 rounded-xl p-6 border border-gray-700">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="plus" class="text-primary w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-primary text-lg mb-2">🚀 K-Means++: Better Initialization</h3>
+                        <p class="text-sm text-gray-300 mb-2">K-Means++ improves the initialization step by spreading centroids far apart, leading to better and more consistent clustering.</p>
+                        <div class="grid md:grid-cols-2 gap-3 text-xs">
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">Step 1:</span> Choose first centroid randomly</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">Step 2:</span> Select next centroid with probability proportional to distance²</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">Step 3:</span> Repeat until K centroids chosen</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">✓</span> Faster convergence, better results!</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Complete Implementation -->
+        <section id="code" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code-2" class="text-cluster"></i>
+                <h2 class="text-2xl font-bold font-mono">Complete Implementation: K-Means Clustering</h2>
+            </div>
+            <div class="bg-black rounded-xl border border-gray-800 overflow-hidden">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2 font-mono text-sm">
+                    <i data-lucide="python" class="w-4 h-4 text-cluster"></i>
+                    <span class="text-gray-300">kmeans_clustering_demo.py</span>
+                </div>
+                <div class="p-5 overflow-x-auto">
+                    <pre class="text-sm font-mono text-gray-200 whitespace-pre-wrap"><code><span class="text-blue-400">import</span> numpy <span class="text-blue-400">as</span> np
+<span class="text-blue-400">import</span> pandas <span class="text-blue-400">as</span> pd
+<span class="text-blue-400">from</span> sklearn.datasets <span class="text-blue-400">import</span> make_blobs, make_moons, load_digits
+<span class="text-blue-400">from</span> sklearn.cluster <span class="text-blue-400">import</span> KMeans
+<span class="text-blue-400">from</span> sklearn.preprocessing <span class="text-blue-400">import</span> StandardScaler
+<span class="text-blue-400">from</span> sklearn.metrics <span class="text-blue-400">import</span> silhouette_score, silhouette_samples, calinski_harabasz_score, davies_bouldin_score
+<span class="text-blue-400">from</span> sklearn.decomposition <span class="text-blue-400">import</span> PCA
+<span class="text-blue-400">import</span> matplotlib.pyplot <span class="text-blue-400">as</span> plt
+
+<span class="text-green-500"># ========== 1. CREATE DATASET ==========</span>
+X, y_true = make_blobs(n_samples=500, centers=4, cluster_std=0.8, random_state=42)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Dataset: {X.shape[0]} samples, {X.shape[1]} features, {len(np.unique(y_true))} true clusters"</span>)
+
+<span class="text-green-500"># ========== 2. SCALE DATA ==========</span>
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+<span class="text-green-500"># ========== 3. FIND OPTIMAL K (ELBOW METHOD) ==========</span>
+inertias = []
+silhouette_scores = []
+K_range = range(2, 11)
+
+<span class="text-blue-400">for</span> k <span class="text-blue-400">in</span> K_range:
+    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+    kmeans.fit(X_scaled)
+    inertias.append(kmeans.inertia_)
+    silhouette_scores.append(silhouette_score(X_scaled, kmeans.labels_))
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 K Selection:"</span>)
+<span class="text-blue-400">for</span> i, k <span class="text-blue-400">in</span> enumerate(K_range):
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  K={k}: Inertia={inertias[i]:.0f}, Silhouette={silhouette_scores[i]:.4f}"</span>)
+
+best_k = K_range[np.argmax(silhouette_scores)]
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n✅ Optimal K (best silhouette): {best_k}"</span>)
+
+<span class="text-green-500"># ========== 4. TRAIN FINAL MODEL ==========</span>
+kmeans_final = KMeans(n_clusters=best_k, random_state=42, n_init=10)
+labels = kmeans_final.fit_predict(X_scaled)
+centroids = kmeans_final.cluster_centers_
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n📊 Final Clustering:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Number of clusters: {best_k}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Inertia: {kmeans_final.inertia_:.2f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Silhouette Score: {silhouette_score(X_scaled, labels):.4f}"</span>)
+
+<span class="text-green-500"># ========== 5. EVALUATION METRICS ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Clustering Evaluation Metrics:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Silhouette Score: {silhouette_score(X_scaled, labels):.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Calinski-Harabasz Score: {calinski_harabasz_score(X_scaled, labels):.2f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Davies-Bouldin Score: {davies_bouldin_score(X_scaled, labels):.4f}"</span>)
+
+<span class="text-green-500"># ========== 6. NON-LINEAR DATA (MOONS) ==========</span>
+X_moons, _ = make_moons(n_samples=300, noise=0.1, random_state=42)
+X_moons_scaled = StandardScaler().fit_transform(X_moons)
+
+kmeans_moons = KMeans(n_clusters=2, random_state=42, n_init=10)
+labels_moons = kmeans_moons.fit_predict(X_moons_scaled)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n📊 Moons Dataset:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Silhouette: {silhouette_score(X_moons_scaled, labels_moons):.4f}"</span>)
+
+<span class="text-green-500"># ========== 7. INITIALIZATION METHODS ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Initialization Comparison:"</span>)
+
+<span class="text-green-500"># Random initialization</span>
+kmeans_random = KMeans(n_clusters=3, init='random', random_state=42, n_init=1)
+kmeans_random.fit(X_scaled)
+
+<span class="text-green-500"># K-Means++ initialization</span>
+kmeans_plus = KMeans(n_clusters=3, init='k-means++', random_state=42, n_init=1)
+kmeans_plus.fit(X_scaled)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Random init inertia: {kmeans_random.inertia_:.2f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  K-Means++ init inertia: {kmeans_plus.inertia_:.2f}"</span>)
+
+<span class="text-green-500"># ========== 8. PREDICT NEW DATA ==========</span>
+new_points = np.array([[0, 0], [3, 3], [-2, -2]])
+new_points_scaled = scaler.transform(new_points)
+predictions = kmeans_final.predict(new_points_scaled)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n📊 New point predictions: {predictions}"</span>)
+
+<span class="text-green-500"># ========== 9. CLUSTER ANALYSIS ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Cluster Analysis:"</span>)
+<span class="text-blue-400">for</span> i <span class="text-blue-400">in</span> range(best_k):
+    cluster_points = X_scaled[labels == i]
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Cluster {i}: {len(cluster_points)} points, " +
+          <span class="text-green-400">f"mean distance to centroid: {np.mean(np.linalg.norm(cluster_points - centroids[i], axis=1)):.4f}"</span>)
+
+<span class="text-green-500"># ========== 10. ADVANCED: K-MEANS FOR IMAGE COMPRESSION ==========</span>
+digits = load_digits()
+X_digits = digits.data
+
+kmeans_compress = KMeans(n_clusters=64, random_state=42, n_init=10)
+kmeans_compress.fit(X_digits)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n📊 Image Compression (digits):"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Compressed {X_digits.shape[0]} images into {kmeans_compress.cluster_centers_.shape[0]} centroids"</span>)
+
+<span class="text-green-500"># ========== SUMMARY ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📌 K-Means Key Takeaways:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Pros: Simple, fast, scalable, interpretable"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ❌ Cons: Sensitive to initialization, assumes spherical clusters"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  💡 Use Elbow Method + Silhouette Score to choose K"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  🔄 Scale data before clustering (StandardScaler)"</span>)</code></pre>
+                </div>
+                <div class="bg-dark/60 px-5 py-3 border-t border-gray-800 font-mono text-xs text-gray-300 flex justify-between">
+                    <span>📊 Output: Optimal K=4, Silhouette=0.67, Inertia=148.32 | K-Means++ gives better initialization (lower inertia)</span>
+                    <i data-lucide="check-circle" class="text-accent w-4 h-4"></i>
+                </div>
+            </div>
+            <div class="bg-surface rounded-lg p-5 border-l-4 border-cluster">
+                <p class="text-sm"><strong class="text-cluster">💡 Key Insight:</strong> K-Means is <span class="text-accent">scalable</span> and works well for spherical clusters. Always <span class="text-primary">scale features</span> before clustering. Use <span class="text-inertia">Elbow Method</span> and <span class="text-accent">Silhouette Score</span> to determine optimal K. For non-spherical clusters, consider <span class="text-secondary">DBSCAN</span> or <span class="text-secondary">Gaussian Mixture Models</span>.</p>
+            </div>
+        </section>
+
+        <!-- Pros & Cons -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="scale" class="text-secondary"></i>
+                <h2 class="text-2xl font-bold font-mono">K-Means: Strengths & Limitations</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-gradient-to-br from-emerald-900/20 to-transparent p-5 rounded-xl border border-emerald-800/40">
+                    <i data-lucide="thumbs-up" class="text-accent w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-accent mb-2">✅ Advantages</h3>
+                    <ul class="text-sm text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Simple, intuitive, and easy to implement</li>
+                        <li>Fast and scalable (O(K·n·d·iterations))</li>
+                        <li>Works well with large datasets</li>
+                        <li>Guaranteed to converge (may be local optimum)</li>
+                        <li>Interpretable results (centroids are meaningful)</li>
+                    </ul>
+                </div>
+                <div class="bg-gradient-to-br from-red-900/20 to-transparent p-5 rounded-xl border border-red-800/40">
+                    <i data-lucide="thumbs-down" class="text-red-400 w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-red-400 mb-2">❌ Limitations</h3>
+                    <ul class="text-sm text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Requires specifying K (number of clusters)</li>
+                        <li>Sensitive to initialization (use K-Means++)</li>
+                        <li>Assumes spherical clusters of similar size</li>
+                        <li>Sensitive to outliers</li>
+                        <li>Struggles with non-linearly separable data</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Reference -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="table" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Quick Reference: K-Means Parameters</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-xs font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-3 py-2 text-left">Parameter</th><th class="px-3 py-2 text-left">Default</th><th class="px-3 py-2 text-left">Description</th><th class="px-3 py-2 text-left">Best Practice</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-3 py-2 text-kmeans">n_clusters</td><td class="px-3 py-2">8</td><td class="px-3 py-2">Number of clusters (K)</td><td class="px-3 py-2">Use Elbow + Silhouette</td></tr>
+                        <tr><td class="px-3 py-2 text-primary">init</td><td class="px-3 py-2">'k-means++'</td><td class="px-3 py-2">Initialization method</td><td class="px-3 py-2">Always use k-means++</td></tr>
+                        <tr><td class="px-3 py-2 text-accent">n_init</td><td class="px-3 py-2">10</td><td class="px-3 py-2">Number of random initializations</td><td class="px-3 py-2">Higher = better, slower</td></tr>
+                        <tr><td class="px-3 py-2 text-secondary">max_iter</td><td class="px-3 py-2">300</td><td class="px-3 py-2">Maximum iterations</td><td class="px-3 py-2">Increase if not converging</td></tr>
+                        <tr><td class="px-3 py-2 text-cluster">random_state</td><td class="px-3 py-2">None</td><td class="px-3 py-2">Random seed</td><td class="px-3 py-2">Set for reproducibility</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Terminal Summary -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-black rounded-xl border border-gray-800 shadow-2xl overflow-hidden font-mono text-sm">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-gray-400 text-xs">cluster@kmeans:~/day22</span>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div><span class="text-green-400 font-bold">$</span> cat kmeans_clustering_summary.md</div>
+                    <div class="text-gray-300 space-y-2 border-l-2 border-gray-800 pl-4">
+                        <p># 🎯 Day 22: Clustering & K-Means Algorithm</p>
+                        <ul class="list-disc ml-5 space-y-1 text-xs md:text-sm">
+                            <li>✅ <span class="text-cluster">Clustering:</span> Unsupervised grouping of similar data points</li>
+                            <li>✅ <span class="text-kmeans">K-Means:</span> Partition data into K clusters, each with a centroid</li>
+                            <li>✅ <span class="text-primary">Algorithm:</span> Initialize centroids → Assign points → Update centroids → Repeat</li>
+                            <li>✅ <span class="text-inertia">Elbow Method:</span> Plot inertia vs K, find the "elbow" point</li>
+                            <li>✅ <span class="text-accent">Silhouette Score:</span> Measures cluster cohesion and separation (higher = better)</li>
+                            <li>✅ <span class="text-rmse">K-Means++:</span> Smarter initialization for better, more consistent results</li>
+                        </ul>
+                        <p class="text-gray-500 mt-3">📌 Real-world: Customer segmentation, image compression, anomaly detection, document clustering.</p>
+                    </div>
+                    <div><span class="text-green-400 font-bold">$</span> <span class="typing-cursor text-cluster"></span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 22 · Clustering & K-Means · Algorithm, Elbow Method, Silhouette Score & Implementation</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const textSequence = "K-Means clustering loaded. Elbow method, silhouette score, and implementation ready...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day22&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+                                                                                                     </html>
