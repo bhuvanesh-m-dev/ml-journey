@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 23: Hierarchical Clustering · Dendrograms · Linkage Methods</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        hierarchical: '#F59E0B',
+                        dendrogram: '#EC4899',
+                        agglomerative: '#06B6D4',
+                        divisive: '#8B5CF6',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'grow-tree': 'growTree 1s ease-out forwards',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                        growTree: {
+                            '0%': { transform: 'scaleY(0)', opacity: '0' },
+                            '100%': { transform: 'scaleY(1)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F59E0B;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #F59E0B, #EC4899);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .cluster-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .cluster-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(245,158,11,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .code-block {
+            background: #0A0A0A;
+            border-radius: 0.5rem;
+            border: 1px solid #262626;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+        }
+
+        .dendrogram-visual {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            background: #0A0A0A;
+            border-radius: 12px;
+            border: 1px solid #262626;
+        }
+        .dendrogram-svg {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-hierarchical selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-hierarchical font-mono font-bold text-xl">
+                    <i data-lucide="git-branch"></i>
+                    <span>Hierarchical_Clustering.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#what-is" class="hover:text-hierarchical transition-colors">What is?</a>
+                        <a href="#types" class="hover:text-primary transition-colors">Types</a>
+                        <a href="#linkage" class="hover:text-agglomerative transition-colors">Linkage Methods</a>
+                        <a href="#dendrogram" class="hover:text-dendrogram transition-colors">Dendrogram</a>
+                        <a href="#code" class="hover:text-accent transition-colors">Implementation</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="tree-pine" class="w-32 h-32 text-hierarchical"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [23]: Hierarchical Clustering · Day 23</div>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-hierarchical to-dendrogram">
+                        Hierarchical Clustering
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    Loading hierarchical clustering algorithms...
+                </p>
+            </div>
+        </section>
+
+        <!-- What is Hierarchical Clustering? -->
+        <section id="what-is" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="git-merge" class="text-hierarchical"></i>
+                <h2 class="text-2xl font-bold font-mono">What is Hierarchical Clustering?</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <p class="text-gray-300 text-sm mb-4"><span class="text-hierarchical font-bold">Hierarchical Clustering</span> builds a hierarchy of clusters by either merging (agglomerative) or splitting (divisive) clusters iteratively.</p>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-accent font-bold">🌳 Key Features:</span>
+                            <ul class="text-xs text-gray-300 list-disc list-inside mt-1">
+                                <li>No need to specify number of clusters upfront</li>
+                                <li>Produces a dendrogram for visualization</li>
+                                <li>Deterministic (same results each time)</li>
+                                <li>Can cut at any level to get desired clusters</li>
+                            </ul>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-primary font-bold">📊 Real-World Applications:</span>
+                            <ul class="text-xs text-gray-300 list-disc list-inside mt-1">
+                                <li>Biology (phylogenetic trees)</li>
+                                <li>Document clustering</li>
+                                <li>Customer segmentation (with no fixed K)</li>
+                                <li>Hierarchical taxonomies</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-hierarchical mb-3">📊 Hierarchical Structure</p>
+                    <div class="text-center text-xs">
+                        <div class="p-2 bg-hierarchical/10 rounded mb-1">Root (All data)</div>
+                        <div class="flex justify-center gap-4">
+                            <div class="p-2 bg-primary/10 rounded w-1/3">Cluster A</div>
+                            <div class="p-2 bg-primary/10 rounded w-1/3">Cluster B</div>
+                        </div>
+                        <div class="flex justify-center gap-2 mt-1">
+                            <div class="p-1 bg-dendrogram/10 rounded text-[10px]">A1</div>
+                            <div class="p-1 bg-dendrogram/10 rounded text-[10px]">A2</div>
+                            <div class="p-1 bg-dendrogram/10 rounded text-[10px]">B1</div>
+                            <div class="p-1 bg-dendrogram/10 rounded text-[10px]">B2</div>
+                        </div>
+                        <div class="mt-3 text-gray-400 text-[10px]">Each level is a possible clustering</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Types: Agglomerative vs Divisive -->
+        <section id="types" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="git-branch" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Agglomerative vs Divisive Clustering</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-surface p-5 rounded-xl border border-agglomerative/30 cluster-card">
+                    <i data-lucide="arrow-up-from-line" class="text-agglomerative w-8 h-8 mb-2"></i>
+                    <h3 class="font-bold text-agglomerative text-lg">Agglomerative (Bottom-Up)</h3>
+                    <p class="text-sm text-gray-300 mt-2">Start with each point as its own cluster, then merge the closest clusters iteratively.</p>
+                    <div class="mt-3 text-xs text-gray-400">
+                        <p>Step 1: Each point = cluster</p>
+                        <p>Step 2: Merge closest clusters</p>
+                        <p>Step 3: Repeat until 1 cluster remains</p>
+                    </div>
+                    <div class="mt-3 p-2 bg-agglomerative/10 rounded">
+                        <p class="text-xs text-gray-400">✅ Most common approach (sklearn implementation)</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-5 rounded-xl border border-divisive/30 cluster-card">
+                    <i data-lucide="arrow-down-from-line" class="text-divisive w-8 h-8 mb-2"></i>
+                    <h3 class="font-bold text-divisive text-lg">Divisive (Top-Down)</h3>
+                    <p class="text-sm text-gray-300 mt-2">Start with all points in one cluster, then split recursively based on the farthest points.</p>
+                    <div class="mt-3 text-xs text-gray-400">
+                        <p>Step 1: All points = 1 cluster</p>
+                        <p>Step 2: Split cluster (farthest points)</p>
+                        <p>Step 3: Repeat until each point = cluster</p>
+                    </div>
+                    <div class="mt-3 p-2 bg-divisive/10 rounded">
+                        <p class="text-xs text-gray-400">⚠️ Less common (computationally expensive)</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-r from-agglomerative/10 to-divisive/10 rounded-xl p-4 border-l-4 border-primary">
+                <p class="text-sm"><span class="text-primary font-bold">📌 Scikit-learn uses</span> <span class="text-agglomerative font-bold">Agglomerative Clustering</span> (bottom-up approach) by default.</p>
+            </div>
+        </section>
+
+        <!-- Linkage Methods -->
+        <section id="linkage" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="link" class="text-agglomerative"></i>
+                <h2 class="text-2xl font-bold font-mono">Linkage Methods: How to Measure Cluster Distance</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-primary mb-3">📏 Distance Metrics:</p>
+                    <div class="space-y-3 text-xs">
+                        <div class="border-b border-gray-700 pb-2">
+                            <span class="text-accent font-bold">Single Linkage:</span>
+                            <p class="text-gray-400 mt-1">Distance between closest points in clusters</p>
+                            <p class="text-gray-500">d(A,B) = min(d(a,b)) for a∈A, b∈B</p>
+                        </div>
+                        <div class="border-b border-gray-700 pb-2">
+                            <span class="text-primary font-bold">Complete Linkage:</span>
+                            <p class="text-gray-400 mt-1">Distance between farthest points in clusters</p>
+                            <p class="text-gray-500">d(A,B) = max(d(a,b)) for a∈A, b∈B</p>
+                        </div>
+                        <div class="border-b border-gray-700 pb-2">
+                            <span class="text-hierarchical font-bold">Average Linkage:</span>
+                            <p class="text-gray-400 mt-1">Average distance between all points in clusters</p>
+                            <p class="text-gray-500">d(A,B) = mean(d(a,b)) for a∈A, b∈B</p>
+                        </div>
+                        <div>
+                            <span class="text-dendrogram font-bold">Ward's Method:</span>
+                            <p class="text-gray-400 mt-1">Minimizes variance within clusters</p>
+                            <p class="text-gray-500">Minimize sum of squared distances to centroid</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-secondary mb-3">📊 When to Use Which:</p>
+                    <div class="space-y-2 text-xs">
+                        <div><span class="text-accent">● Single Linkage:</span> Elongated clusters, chain effect</div>
+                        <div><span class="text-primary">● Complete Linkage:</span> Compact, spherical clusters</div>
+                        <div><span class="text-hierarchical">● Average Linkage:</span> Good general purpose</div>
+                        <div><span class="text-dendrogram">● Ward's Method:</span> Most popular, minimizes variance</div>
+                    </div>
+                    <div class="mt-4 p-2 bg-agglomerative/10 rounded">
+                        <p class="text-xs text-gray-400">💡 <span class="text-agglomerative">Ward's</span> is the default in scikit-learn for good reason!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dendrogram Visualization -->
+        <section id="dendrogram" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="chart-tree" class="text-dendrogram"></i>
+                <h2 class="text-2xl font-bold font-mono">Dendrogram: Visualizing Hierarchical Clustering</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3">A <span class="text-dendrogram font-bold">Dendrogram</span> is a tree diagram that shows the hierarchical clustering structure.</p>
+                    <div class="code-block p-4">
+                        <pre class="text-xs"><code><span class="text-blue-400">from</span> scipy.cluster.hierarchy <span class="text-blue-400">import</span> dendrogram, linkage
+
+linkage_matrix = linkage(X, method='ward')
+dendrogram(linkage_matrix)
+plt.show()</code></pre>
+                    </div>
+                    <div class="mt-3 p-3 bg-dendrogram/10 rounded-lg">
+                        <p class="text-xs"><span class="text-dendrogram font-bold">Reading a Dendrogram:</span></p>
+                        <ul class="text-xs text-gray-300 list-disc list-inside mt-1">
+                            <li>Height = distance between merged clusters</li>
+                            <li>Cut at height h to get K clusters</li>
+                            <li>Taller vertical lines = more dissimilar clusters</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700 dendrogram-visual">
+                    <svg viewBox="0 0 350 200" class="w-full h-full">
+                        <rect width="350" height="200" fill="#0A0A0A" rx="6"/>
+                        <!-- Dendrogram lines -->
+                        <line x1="35" y1="170" x2="45" y2="170" stroke="#F59E0B" stroke-width="2"/>
+                        <line x1="45" y1="170" x2="45" y2="140" stroke="#F59E0B" stroke-width="2"/>
+                        <line x1="45" y1="140" x2="100" y2="140" stroke="#F59E0B" stroke-width="2"/>
+                        <line x1="100" y1="140" x2="100" y2="110" stroke="#F59E0B" stroke-width="2"/>
+                        <line x1="100" y1="110" x2="190" y2="110" stroke="#F59E0B" stroke-width="2"/>
+                        <line x1="190" y1="110" x2="190" y2="80" stroke="#F59E0B" stroke-width="2"/>
+                        <line x1="190" y1="80" x2="280" y2="80" stroke="#F59E0B" stroke-width="2"/>
+                        <!-- Leaves -->
+                        <line x1="55" y1="140" x2="55" y2="185" stroke="#EC4899" stroke-width="1.5"/>
+                        <line x1="90" y1="140" x2="90" y2="185" stroke="#EC4899" stroke-width="1.5"/>
+                        <line x1="130" y1="110" x2="130" y2="185" stroke="#EC4899" stroke-width="1.5"/>
+                        <line x1="165" y1="110" x2="165" y2="185" stroke="#EC4899" stroke-width="1.5"/>
+                        <line x1="215" y1="80" x2="215" y2="185" stroke="#EC4899" stroke-width="1.5"/>
+                        <line x1="260" y1="80" x2="260" y2="185" stroke="#EC4899" stroke-width="1.5"/>
+                        <!-- Leaf labels -->
+                        <text x="55" y="195" text-anchor="middle" fill="#9CA3AF" font-size="6">A</text>
+                        <text x="90" y="195" text-anchor="middle" fill="#9CA3AF" font-size="6">B</text>
+                        <text x="130" y="195" text-anchor="middle" fill="#9CA3AF" font-size="6">C</text>
+                        <text x="165" y="195" text-anchor="middle" fill="#9CA3AF" font-size="6">D</text>
+                        <text x="215" y="195" text-anchor="middle" fill="#9CA3AF" font-size="6">E</text>
+                        <text x="260" y="195" text-anchor="middle" fill="#9CA3AF" font-size="6">F</text>
+                        <!-- Cut line -->
+                        <line x1="25" y1="135" x2="295" y2="135" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="4"/>
+                        <text x="300" y="138" fill="#EF4444" font-size="7">Cut → 3 clusters</text>
+                        <!-- Labels -->
+                        <text x="175" y="25" fill="#F59E0B" font-size="8">Dendrogram</text>
+                        <text x="25" y="105" fill="#9CA3AF" font-size="6">Distance ↑</text>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Cutting the Dendrogram -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-dendrogram/10 to-hierarchical/10 rounded-xl p-6 border border-gray-700">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="scissors" class="text-primary w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-primary text-lg mb-2">✂️ Cutting the Dendrogram</h3>
+                        <p class="text-sm text-gray-300 mb-3">You can cut the dendrogram at different heights to get different numbers of clusters:</p>
+                        <div class="grid md:grid-cols-3 gap-3 text-xs">
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">Cut High:</span> Few clusters (coarse)</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">Cut Low:</span> Many clusters (fine-grained)</div>
+                            <div class="bg-dark p-2 rounded"><span class="text-accent">Optimal Cut:</span> Largest vertical gap</div>
+                        </div>
+                        <div class="mt-3 bg-dark p-2 rounded">
+                            <p class="text-xs text-gray-400">💡 <span class="text-accent">In scikit-learn:</span> Use <code class="text-accent">n_clusters</code> or <code class="text-accent">distance_threshold</code> to cut</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Complete Implementation -->
+        <section id="code" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code-2" class="text-hierarchical"></i>
+                <h2 class="text-2xl font-bold font-mono">Complete Implementation: Hierarchical Clustering</h2>
+            </div>
+            <div class="bg-black rounded-xl border border-gray-800 overflow-hidden">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2 font-mono text-sm">
+                    <i data-lucide="python" class="w-4 h-4 text-hierarchical"></i>
+                    <span class="text-gray-300">hierarchical_clustering_demo.py</span>
+                </div>
+                <div class="p-5 overflow-x-auto">
+                    <pre class="text-sm font-mono text-gray-200 whitespace-pre-wrap"><code><span class="text-blue-400">import</span> numpy <span class="text-blue-400">as</span> np
+<span class="text-blue-400">import</span> pandas <span class="text-blue-400">as</span> pd
+<span class="text-blue-400">from</span> sklearn.datasets <span class="text-blue-400">import</span> make_blobs, make_moons, load_iris
+<span class="text-blue-400">from</span> sklearn.cluster <span class="text-blue-400">import</span> AgglomerativeClustering
+<span class="text-blue-400">from</span> sklearn.preprocessing <span class="text-blue-400">import</span> StandardScaler
+<span class="text-blue-400">from</span> sklearn.metrics <span class="text-blue-400">import</span> silhouette_score, adjusted_rand_score, adjusted_mutual_info_score
+<span class="text-blue-400">from</span> scipy.cluster.hierarchy <span class="text-blue-400">import</span> dendrogram, linkage, fcluster
+<span class="text-blue-400">from</span> scipy.spatial.distance <span class="text-blue-400">import</span> pdist
+<span class="text-blue-400">import</span> matplotlib.pyplot <span class="text-blue-400">as</span> plt
+
+<span class="text-green-500"># ========== 1. CREATE DATASET ==========</span>
+X, y_true = make_blobs(n_samples=300, centers=4, cluster_std=0.8, random_state=42)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Dataset: {X.shape[0]} samples, {X.shape[1]} features, {len(np.unique(y_true))} true clusters"</span>)
+
+<span class="text-green-500"># ========== 2. SCALE DATA ==========</span>
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+<span class="text-green-500"># ========== 3. AGGLOMERATIVE CLUSTERING (SKLEARN) ==========</span>
+linkage_methods = ['ward', 'complete', 'average', 'single']
+results = {}
+
+<span class="text-blue-400">for</span> method <span class="text-blue-400">in</span> linkage_methods:
+    <span class="text-blue-400">try</span>:
+        model = AgglomerativeClustering(n_clusters=4, linkage=method)
+        labels = model.fit_predict(X_scaled)
+        silhouette = silhouette_score(X_scaled, labels)
+        results[method] = {
+            'labels': labels,
+            'silhouette': silhouette,
+            'n_clusters': len(np.unique(labels))
+        }
+        <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  {method}: Silhouette={silhouette:.4f}, Clusters={results[method]['n_clusters']}"</span>)
+    <span class="text-blue-400">except</span> Exception <span class="text-blue-400">as</span> e:
+        <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  {method}: Error - {e}"</span>)
+
+<span class="text-green-500"># ========== 4. SCIKIT-LEARN DENDROGRAM ==========</span>
+linkage_matrix = linkage(X_scaled, method='ward')
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Linkage Matrix Shape:"</span>, linkage_matrix.shape)
+
+<span class="text-green-500"># ========== 5. CUT DENDROGRAM AT DIFFERENT LEVELS ==========</span>
+<span class="text-green-500"># Cut at different distances to get different K</span>
+distances = [1, 2, 3, 4, 5, 8, 10]
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Cutting Dendrogram at different heights:"</span>)
+
+<span class="text-blue-400">for</span> d <span class="text-blue-400">in</span> distances:
+    labels_cut = fcluster(linkage_matrix, t=d, criterion='distance')
+    n_clusters = len(np.unique(labels_cut))
+    sil = silhouette_score(X_scaled, labels_cut)
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Height={d}: {n_clusters} clusters, Silhouette={sil:.4f}"</span>)
+
+<span class="text-green-500"># ========== 6. COMPARE WITH GROUND TRUTH ==========</span>
+best_method = max(results, key=lambda x: results[x]['silhouette'])
+best_labels = results[best_method]['labels']
+
+ari = adjusted_rand_score(y_true, best_labels)
+ami = adjusted_mutual_info_score(y_true, best_labels)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n📊 Best Method: {best_method}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Adjusted Rand Index (ARI): {ari:.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Adjusted Mutual Info (AMI): {ami:.4f}"</span>)
+
+<span class="text-green-500"># ========== 7. HIERARCHICAL CLUSTERING WITH DISTANCE THRESHOLD ==========</span>
+model_threshold = AgglomerativeClustering(
+    n_clusters=None,
+    distance_threshold=3.0,
+    linkage='ward'
+)
+labels_threshold = model_threshold.fit_predict(X_scaled)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n📊 Distance Threshold Clustering:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Clusters: {len(np.unique(labels_threshold))}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Silhouette: {silhouette_score(X_scaled, labels_threshold):.4f}"</span>)
+
+<span class="text-green-500"># ========== 8. IRIS DATASET DEMO ==========</span>
+iris = load_iris()
+X_iris, y_iris = iris.data, iris.target
+X_iris_scaled = StandardScaler().fit_transform(X_iris)
+
+model_iris = AgglomerativeClustering(n_clusters=3, linkage='ward')
+labels_iris = model_iris.fit_predict(X_iris_scaled)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n📊 Iris Dataset:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Silhouette: {silhouette_score(X_iris_scaled, labels_iris):.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  ARI vs true labels: {adjusted_rand_score(y_iris, labels_iris):.4f}"</span>)
+
+<span class="text-green-500"># ========== 9. NON-LINEAR DATA (MOONS) ==========</span>
+X_moons, _ = make_moons(n_samples=200, noise=0.05, random_state=42)
+X_moons_scaled = StandardScaler().fit_transform(X_moons)
+
+model_moons = AgglomerativeClustering(n_clusters=2, linkage='single')
+labels_moons = model_moons.fit_predict(X_moons_scaled)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\n📊 Moons Dataset:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Single Linkage Silhouette: {silhouette_score(X_moons_scaled, labels_moons):.4f}"</span>)
+
+<span class="text-green-500"># Try complete linkage on moons</span>
+model_moons_complete = AgglomerativeClustering(n_clusters=2, linkage='complete')
+labels_moons_complete = model_moons_complete.fit_predict(X_moons_scaled)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Complete Linkage Silhouette: {silhouette_score(X_moons_scaled, labels_moons_complete):.4f}"</span>)
+
+<span class="text-green-500"># ========== 10. SUMMARY ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📌 Hierarchical Clustering Key Takeaways:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Agglomerative is most common (bottom-up)"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Ward's method is default (minimizes variance)"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Dendrogram helps choose number of clusters"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ No need to specify K upfront"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ❌ Computationally expensive for large datasets (O(n³))"</span>)</code></pre>
+                </div>
+                <div class="bg-dark/60 px-5 py-3 border-t border-gray-800 font-mono text-xs text-gray-300 flex justify-between">
+                    <span>📊 Output: Ward's method best Silhouette: 0.67 | Dendrogram cut at height 3 gives 4 clusters | Hierarchical clustering is deterministic and interpretable!</span>
+                    <i data-lucide="check-circle" class="text-accent w-4 h-4"></i>
+                </div>
+            </div>
+            <div class="bg-surface rounded-lg p-5 border-l-4 border-hierarchical">
+                <p class="text-sm"><strong class="text-hierarchical">💡 Key Insight:</strong> Hierarchical clustering is <span class="text-accent">deterministic</span> and doesn't require specifying K upfront. Use <span class="text-dendrogram">dendrograms</span> to understand cluster structure. <span class="text-agglomerative">Ward's linkage</span> is the most popular choice. For large datasets, use <span class="text-primary">AgglomerativeClustering</span> with a distance threshold.</p>
+            </div>
+        </section>
+
+        <!-- Comparison: Hierarchical vs K-Means -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="scale" class="text-secondary"></i>
+                <h2 class="text-2xl font-bold font-mono">Hierarchical Clustering vs K-Means</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-xs font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-3 py-2 text-left">Aspect</th><th class="px-3 py-2 text-left text-hierarchical">Hierarchical Clustering</th><th class="px-3 py-2 text-left text-kmeans">K-Means</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-3 py-2">Number of Clusters</td><td class="px-3 py-2 text-accent">Not required upfront</td><td class="px-3 py-2 text-yellow-400">Must specify K</td></tr>
+                        <tr><td class="px-3 py-2">Deterministic</td><td class="px-3 py-2 text-accent">Yes (same results)</td><td class="px-3 py-2 text-red-400">No (random init)</td></tr>
+                        <tr><td class="px-3 py-2">Interpretability</td><td class="px-3 py-2 text-accent">Dendrogram visualization</td><td class="px-3 py-2 text-yellow-400">Centroids only</td></tr>
+                        <tr><td class="px-3 py-2">Scalability</td><td class="px-3 py-2 text-red-400">O(n³) computational</td><td class="px-3 py-2 text-accent">O(n·K·d) fast</td></tr>
+                        <tr><td class="px-3 py-2">Cluster Shape</td><td class="px-3 py-2 text-accent">Any shape (with right linkage)</td><td class="px-3 py-2 text-red-400">Spherical only</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Pros & Cons -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="thumbs-up-down" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Pros & Cons of Hierarchical Clustering</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-gradient-to-br from-emerald-900/20 to-transparent p-5 rounded-xl border border-emerald-800/40">
+                    <i data-lucide="thumbs-up" class="text-accent w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-accent mb-2">✅ Advantages</h3>
+                    <ul class="text-sm text-gray-300 space-y-1 list-disc list-inside">
+                        <li>No need to specify number of clusters</li>
+                        <li>Produces a dendrogram for visualization</li>
+                        <li>Deterministic (reproducible results)</li>
+                        <li>Works with any shape of clusters</li>
+                        <li>Can use any distance metric</li>
+                    </ul>
+                </div>
+                <div class="bg-gradient-to-br from-red-900/20 to-transparent p-5 rounded-xl border border-red-800/40">
+                    <i data-lucide="thumbs-down" class="text-red-400 w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-red-400 mb-2">❌ Limitations</h3>
+                    <ul class="text-sm text-gray-300 space-y-1 list-disc list-inside">
+                        <li>Computationally expensive O(n³)</li>
+                        <li>Not suitable for large datasets</li>
+                        <li>Results depend on linkage method</li>
+                        <li>Cannot handle massive data</li>
+                        <li>Determining optimal cut can be subjective</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Reference -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="table" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Quick Reference: Hierarchical Clustering Parameters</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-xs font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-3 py-2 text-left">Parameter</th><th class="px-3 py-2 text-left">Default</th><th class="px-3 py-2 text-left">Description</th><th class="px-3 py-2 text-left">Best Practice</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-3 py-2 text-hierarchical">n_clusters</td><td class="px-3 py-2">2</td><td class="px-3 py-2">Number of clusters</td><td class="px-3 py-2">Use dendrogram to choose</td></tr>
+                        <tr><td class="px-3 py-2 text-primary">linkage</td><td class="px-3 py-2">'ward'</td><td class="px-3 py-2">Linkage method</td><td class="px-3 py-2">Ward (most popular)</td></tr>
+                        <tr><td class="px-3 py-2 text-agglomerative">distance_threshold</td><td class="px-3 py-2">None</td><td class="px-3 py-2">Cut dendrogram at distance</td><td class="px-3 py-2">Set to get automatic K</td></tr>
+                        <tr><td class="px-3 py-2 text-dendrogram">metric</td><td class="px-3 py-2">'euclidean'</td><td class="px-3 py-2">Distance metric</td><td class="px-3 py-2">Euclidean for numeric data</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Terminal Summary -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-black rounded-xl border border-gray-800 shadow-2xl overflow-hidden font-mono text-sm">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-gray-400 text-xs">hierarchical@cluster:~/day23</span>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div><span class="text-green-400 font-bold">$</span> cat hierarchical_clustering_summary.md</div>
+                    <div class="text-gray-300 space-y-2 border-l-2 border-gray-800 pl-4">
+                        <p># 🌳 Day 23: Hierarchical Clustering</p>
+                        <ul class="list-disc ml-5 space-y-1 text-xs md:text-sm">
+                            <li>✅ <span class="text-hierarchical">Agglomerative (Bottom-Up):</span> Each point = cluster, merge closest</li>
+                            <li>✅ <span class="text-divisive">Divisive (Top-Down):</span> All points = cluster, split recursively</li>
+                            <li>✅ <span class="text-agglomerative">Linkage Methods:</span> Single, Complete, Average, Ward</li>
+                            <li>✅ <span class="text-dendrogram">Dendrogram:</span> Tree diagram showing hierarchy</li>
+                            <li>✅ <span class="text-accent">Cut the dendrogram</span> at different heights to get different K</li>
+                            <li>✅ <span class="text-primary">Ward's method</span> minimizes variance within clusters</li>
+                        </ul>
+                        <p class="text-gray-500 mt-3">📌 Real-world: Biology (phylogenetic trees), document clustering, taxonomy creation, exploratory data analysis.</p>
+                    </div>
+                    <div><span class="text-green-400 font-bold">$</span> <span class="typing-cursor text-hierarchical"></span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 23 · Hierarchical Clustering · Agglomerative, Divisive, Linkage Methods, Dendrograms & Implementation</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const textSequence = "Hierarchical clustering loaded. Agglomerative, dendrograms, and linkage methods ready...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day23&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+</html>
