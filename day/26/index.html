@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 26: Complete ML Revision · 25 Days of Data Science</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        day1: '#38BDF8',
+                        day2: '#F97316',
+                        day3: '#06B6D4',
+                        day4: '#EC4899',
+                        day5: '#F59E0B',
+                        day6: '#22C55E',
+                        day7: '#EF4444',
+                        day8: '#8B5CF6',
+                        day9: '#4DABF7',
+                        day10: '#14B8A6',
+                        day11: '#FF6B6B',
+                        day12: '#F43F5E',
+                        day13: '#E11D48',
+                        day14: '#F59E0B',
+                        day15: '#D97706',
+                        day16: '#7C3AED',
+                        day17: '#059669',
+                        day18: '#0891B2',
+                        day19: '#0D9488',
+                        day20: '#2563EB',
+                        day21: '#9333EA',
+                        day22: '#EAB308',
+                        day23: '#16A34A',
+                        day24: '#DC2626',
+                        day25: '#DB2777',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #38BDF8;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #38BDF8, #A855F7);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .revision-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .revision-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(56,189,248,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .code-block {
+            background: #0A0A0A;
+            border-radius: 0.5rem;
+            border: 1px solid #262626;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.7rem;
+            overflow-x: auto;
+        }
+
+        .timeline-line {
+            position: relative;
+            padding-left: 24px;
+        }
+        .timeline-line::before {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, #38BDF8, #A855F7);
+            opacity: 0.3;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: 0;
+            top: 6px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid #38BDF8;
+            background: #0A0A0A;
+        }
+        .timeline-dot.completed {
+            background: #38BDF8;
+        }
+
+        .topic-tag {
+            display: inline-block;
+            padding: 1px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: #1a1a1a;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #38BDF8, #A855F7);
+            transition: width 1s ease;
+        }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-primary selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-primary font-mono font-bold text-xl">
+                    <i data-lucide="book-open"></i>
+                    <span>ML_Complete_Revision.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#overview" class="hover:text-primary transition-colors">Overview</a>
+                        <a href="#days" class="hover:text-secondary transition-colors">All Days</a>
+                        <a href="#summary" class="hover:text-accent transition-colors">Summary</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="award" class="w-32 h-32 text-primary"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [26]: Complete Revision · Day 26</div>
+                <h1 class="text-4xl md:text-6xl font-extrabold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-accent">
+                        25 Days of ML Mastery
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    🎯 Complete revision of all concepts from Day 1 to Day 25...
+                </p>
+                <div class="mt-6 flex items-center gap-4 flex-wrap">
+                    <div class="bg-dark/50 px-4 py-2 rounded-lg">
+                        <span class="text-primary font-mono">25</span>
+                        <span class="text-gray-400 text-sm ml-1">Days</span>
+                    </div>
+                    <div class="bg-dark/50 px-4 py-2 rounded-lg">
+                        <span class="text-secondary font-mono">10+</span>
+                        <span class="text-gray-400 text-sm ml-1">Algorithms</span>
+                    </div>
+                    <div class="bg-dark/50 px-4 py-2 rounded-lg">
+                        <span class="text-accent font-mono">100%</span>
+                        <span class="text-gray-400 text-sm ml-1">Complete</span>
+                    </div>
+                </div>
+                <!-- Progress Bar -->
+                <div class="mt-6">
+                    <div class="flex justify-between text-xs text-gray-400 mb-1">
+                        <span>Progress</span>
+                        <span>100%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Overview -->
+        <section id="overview" class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="list-checks" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">📚 What We've Covered</h2>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 text-center">
+                    <span class="text-primary font-bold text-2xl">🧠</span>
+                    <p class="text-xs text-gray-400 mt-1">ML Fundamentals</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 text-center">
+                    <span class="text-secondary font-bold text-2xl">📊</span>
+                    <p class="text-xs text-gray-400 mt-1">Statistical Learning</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 text-center">
+                    <span class="text-accent font-bold text-2xl">🐍</span>
+                    <p class="text-xs text-gray-400 mt-1">Python Libraries</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 text-center">
+                    <span class="text-day7 font-bold text-2xl">🤖</span>
+                    <p class="text-xs text-gray-400 mt-1">ML Algorithms</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 text-center">
+                    <span class="text-day4 font-bold text-2xl">📈</span>
+                    <p class="text-xs text-gray-400 mt-1">Evaluation</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 text-center">
+                    <span class="text-day5 font-bold text-2xl">⚙️</span>
+                    <p class="text-xs text-gray-400 mt-1">Feature Engineering</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 text-center">
+                    <span class="text-day17 font-bold text-2xl">🔄</span>
+                    <p class="text-xs text-gray-400 mt-1">Data Preprocessing</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 text-center">
+                    <span class="text-day24 font-bold text-2xl">📉</span>
+                    <p class="text-xs text-gray-400 mt-1">Dimensionality Reduction</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- All Days Revision -->
+        <section id="days" class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="calendar" class="text-secondary"></i>
+                <h2 class="text-2xl font-bold font-mono">📅 Day-by-Day Revision</h2>
+            </div>
+            <div class="timeline-line space-y-4 mt-6">
+                <!-- Day 1 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day1 font-mono font-bold">Day 1</span>
+                            <span class="topic-tag bg-day1/20 text-day1">Intro to DS & ML</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Data Science vs Data Analysis vs Data Analytics. Machine Learning basics and types.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Supervised</span>
+                            <span class="px-2 py-1 bg-dark rounded">Unsupervised</span>
+                            <span class="px-2 py-1 bg-dark rounded">Semi-Supervised</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 2 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day2 font-mono font-bold">Day 2</span>
+                            <span class="topic-tag bg-day2/20 text-day2">Logistic Regression</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Sigmoid function, probability outputs, decision boundary, confusion matrix, ROC-AUC.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Sigmoid</span>
+                            <span class="px-2 py-1 bg-dark rounded">Log-Odds</span>
+                            <span class="px-2 py-1 bg-dark rounded">ROC-AUC</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 3 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day3 font-mono font-bold">Day 3</span>
+                            <span class="topic-tag bg-day3/20 text-day3">Decision Trees</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Entropy, Information Gain, Gini Impurity, Pruning, Feature Importance.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Entropy</span>
+                            <span class="px-2 py-1 bg-dark rounded">Gini</span>
+                            <span class="px-2 py-1 bg-dark rounded">Pruning</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 4 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day4 font-mono font-bold">Day 4</span>
+                            <span class="topic-tag bg-day4/20 text-day4">K-Nearest Neighbors</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Euclidean distance, K value selection, distance metrics, lazy learning.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Euclidean</span>
+                            <span class="px-2 py-1 bg-dark rounded">Manhattan</span>
+                            <span class="px-2 py-1 bg-dark rounded">Minkowski</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 5 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day5 font-mono font-bold">Day 5</span>
+                            <span class="topic-tag bg-day5/20 text-day5">Bias-Variance Tradeoff</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Bias, Variance, Underfitting, Overfitting, the sweet spot, regularization.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Underfitting</span>
+                            <span class="px-2 py-1 bg-dark rounded">Overfitting</span>
+                            <span class="px-2 py-1 bg-dark rounded">Regularization</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 6 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day6 font-mono font-bold">Day 6</span>
+                            <span class="topic-tag bg-day6/20 text-day6">Random Forest</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Bootstrap Aggregation (Bagging), Feature Randomization, Classification & Regression.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Bootstrap</span>
+                            <span class="px-2 py-1 bg-dark rounded">Bagging</span>
+                            <span class="px-2 py-1 bg-dark rounded">OOB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 7 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day7 font-mono font-bold">Day 7</span>
+                            <span class="topic-tag bg-day7/20 text-day7">Support Vector Machines</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Hyperplane, Support Vectors, Maximum Margin, Kernel Trick (RBF, Polynomial).</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Hyperplane</span>
+                            <span class="px-2 py-1 bg-dark rounded">Kernel</span>
+                            <span class="px-2 py-1 bg-dark rounded">RBF</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 8 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day8 font-mono font-bold">Day 8</span>
+                            <span class="topic-tag bg-day8/20 text-day8">Naive Bayes</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Bayes' Theorem, Conditional Independence, Gaussian/Multinomial/Bernoulli NB.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Bayes</span>
+                            <span class="px-2 py-1 bg-dark rounded">Laplace</span>
+                            <span class="px-2 py-1 bg-dark rounded">Smoothing</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 9 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day9 font-mono font-bold">Day 9</span>
+                            <span class="topic-tag bg-day9/20 text-day9">NumPy Fundamentals</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">History, ndarray, vectorization, broadcasting, mathematical operations.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">ndarray</span>
+                            <span class="px-2 py-1 bg-dark rounded">Vectorization</span>
+                            <span class="px-2 py-1 bg-dark rounded">Broadcasting</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 10 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day10 font-mono font-bold">Day 10</span>
+                            <span class="topic-tag bg-day10/20 text-day10">NumPy Deep Dive</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">1D/2D/3D arrays, matrix operations, log, exp, trig functions.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Matrices</span>
+                            <span class="px-2 py-1 bg-dark rounded">Dot Product</span>
+                            <span class="px-2 py-1 bg-dark rounded">Universal</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 11 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day11 font-mono font-bold">Day 11</span>
+                            <span class="topic-tag bg-day11/20 text-day11">Pandas Intro</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Series, DataFrame, data manipulation, reading/writing data.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Series</span>
+                            <span class="px-2 py-1 bg-dark rounded">DataFrame</span>
+                            <span class="px-2 py-1 bg-dark rounded">GroupBy</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 12 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day12 font-mono font-bold">Day 12</span>
+                            <span class="topic-tag bg-day12/20 text-day12">Advanced Pandas</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">MultiIndex, Pivot/Melt, Time Series, String Ops, Categorical data.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">MultiIndex</span>
+                            <span class="px-2 py-1 bg-dark rounded">Resample</span>
+                            <span class="px-2 py-1 bg-dark rounded">Category</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 13 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day13 font-mono font-bold">Day 13</span>
+                            <span class="topic-tag bg-day13/20 text-day13">Deeper Pandas</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Advanced GroupBy, Transform, Custom Apply, Method Chaining, Pipelines.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Transform</span>
+                            <span class="px-2 py-1 bg-dark rounded">Pipe</span>
+                            <span class="px-2 py-1 bg-dark rounded">Chain</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 14 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day14 font-mono font-bold">Day 14</span>
+                            <span class="topic-tag bg-day14/20 text-day14">Feature Selection I</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Correlation Analysis, Data Handling, Controlling indices and columns.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Correlation</span>
+                            <span class="px-2 py-1 bg-dark rounded">Indexing</span>
+                            <span class="px-2 py-1 bg-dark rounded">Cleaning</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 15 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day15 font-mono font-bold">Day 15</span>
+                            <span class="topic-tag bg-day15/20 text-day15">Advanced Feature Selection</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Filter, Wrapper, Embedded, Hybrid methods, Boruta, RFE, Lasso.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Filter</span>
+                            <span class="px-2 py-1 bg-dark rounded">Wrapper</span>
+                            <span class="px-2 py-1 bg-dark rounded">Embedded</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 16 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day16 font-mono font-bold">Day 16</span>
+                            <span class="topic-tag bg-day16/20 text-day16">Categorical Encoding</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Label Encoding, One-Hot Encoding, Ordinal vs Nominal.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Label</span>
+                            <span class="px-2 py-1 bg-dark rounded">One-Hot</span>
+                            <span class="px-2 py-1 bg-dark rounded">Target</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 17 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day17 font-mono font-bold">Day 17</span>
+                            <span class="topic-tag bg-day17/20 text-day17">Imbalanced Data</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">SMOTE, Oversampling, Undersampling, Evaluation metrics for imbalanced data.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">SMOTE</span>
+                            <span class="px-2 py-1 bg-dark rounded">Oversample</span>
+                            <span class="px-2 py-1 bg-dark rounded">Undersample</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 18 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day18 font-mono font-bold">Day 18</span>
+                            <span class="topic-tag bg-day18/20 text-day18">Train-Test Split</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Cross-Validation, Stratified Split, K-Fold, Leave-One-Out.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">K-Fold</span>
+                            <span class="px-2 py-1 bg-dark rounded">Stratified</span>
+                            <span class="px-2 py-1 bg-dark rounded">CV</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 19 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day19 font-mono font-bold">Day 19</span>
+                            <span class="topic-tag bg-day19/20 text-day19">Feature Scaling</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Standardization (Z-score), Normalization (Min-Max), Robust Scaling.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Standard</span>
+                            <span class="px-2 py-1 bg-dark rounded">MinMax</span>
+                            <span class="px-2 py-1 bg-dark rounded">Robust</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 20 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day20 font-mono font-bold">Day 20</span>
+                            <span class="topic-tag bg-day20/20 text-day20">Classification Metrics</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Confusion Matrix, Precision, Recall, F1-Score, ROC-AUC.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Precision</span>
+                            <span class="px-2 py-1 bg-dark rounded">Recall</span>
+                            <span class="px-2 py-1 bg-dark rounded">F1</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 21 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day21 font-mono font-bold">Day 21</span>
+                            <span class="topic-tag bg-day21/20 text-day21">Regression Metrics</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">MAE, MSE, RMSE, R², Adjusted R², Explained Variance.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">MAE</span>
+                            <span class="px-2 py-1 bg-dark rounded">RMSE</span>
+                            <span class="px-2 py-1 bg-dark rounded">R²</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 22 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day22 font-mono font-bold">Day 22</span>
+                            <span class="topic-tag bg-day22/20 text-day22">K-Means Clustering</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Elbow Method, Silhouette Score, K-Means++, Centroids.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Elbow</span>
+                            <span class="px-2 py-1 bg-dark rounded">Silhouette</span>
+                            <span class="px-2 py-1 bg-dark rounded">Inertia</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 23 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day23 font-mono font-bold">Day 23</span>
+                            <span class="topic-tag bg-day23/20 text-day23">Hierarchical Clustering</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Agglomerative, Divisive, Dendrograms, Linkage Methods (Ward, Single, Complete).</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">Dendrogram</span>
+                            <span class="px-2 py-1 bg-dark rounded">Ward</span>
+                            <span class="px-2 py-1 bg-dark rounded">Linkage</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 24 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day24 font-mono font-bold">Day 24</span>
+                            <span class="topic-tag bg-day24/20 text-day24">Principal Component Analysis</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">Eigenvalues, Eigenvectors, Explained Variance, Dimensionality Reduction.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">PCA</span>
+                            <span class="px-2 py-1 bg-dark rounded">Eigen</span>
+                            <span class="px-2 py-1 bg-dark rounded">Variance</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 25 -->
+                <div class="relative pl-8">
+                    <div class="timeline-dot completed"></div>
+                    <div class="bg-surface p-4 rounded-xl border border-gray-800 revision-card">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="text-day25 font-mono font-bold">Day 25</span>
+                            <span class="topic-tag bg-day25/20 text-day25">Outlier Detection</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mt-2">IQR, Z-Score, Isolation Forest, LOF, DBSCAN, Handling Strategies.</p>
+                        <div class="flex gap-2 mt-2 flex-wrap text-xs">
+                            <span class="px-2 py-1 bg-dark rounded">IQR</span>
+                            <span class="px-2 py-1 bg-dark rounded">Z-Score</span>
+                            <span class="px-2 py-1 bg-dark rounded">Isolation</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Formula Summary -->
+        <section id="summary" class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="sigma" class="text-accent"></i>
+                <h2 class="text-2xl font-bold font-mono">📐 Key Formulas Cheat Sheet</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4 mt-4">
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <p class="font-bold text-primary text-sm">Sigmoid Function</p>
+                    <p class="font-mono text-xs text-gray-300 mt-1">σ(z) = 1 / (1 + e⁻ᶻ)</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <p class="font-bold text-secondary text-sm">Euclidean Distance</p>
+                    <p class="font-mono text-xs text-gray-300 mt-1">d(p,q) = √Σ(qᵢ - pᵢ)²</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <p class="font-bold text-day5 text-sm">Entropy</p>
+                    <p class="font-mono text-xs text-gray-300 mt-1">H(S) = -Σpᵢ log₂(pᵢ)</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <p class="font-bold text-day7 text-sm">SVM Margin</p>
+                    <p class="font-mono text-xs text-gray-300 mt-1">Margin = 2/||w||</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <p class="font-bold text-day8 text-sm">Bayes' Theorem</p>
+                    <p class="font-mono text-xs text-gray-300 mt-1">P(A|B) = P(B|A)P(A) / P(B)</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <p class="font-bold text-day21 text-sm">RMSE</p>
+                    <p class="font-mono text-xs text-gray-300 mt-1">RMSE = √(Σ(ŷᵢ - yᵢ)²/n)</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <p class="font-bold text-day21 text-sm">R² Score</p>
+                    <p class="font-mono text-xs text-gray-300 mt-1">R² = 1 - MSE/Var(y)</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <p class="font-bold text-day20 text-sm">F1-Score</p>
+                    <p class="font-mono text-xs text-gray-300 mt-1">F1 = 2·P·R / (P + R)</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <p class="font-bold text-day24 text-sm">Eigen Decomposition</p>
+                    <p class="font-mono text-xs text-gray-300 mt-1">Σv = λv</p>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800">
+                    <p class="font-bold text-day22 text-sm">K-Means Inertia</p>
+                    <p class="font-mono text-xs text-gray-300 mt-1">J = Σᵢ Σₓ∈Cᵢ ||x - μᵢ||²</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Algorithm Comparison -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="git-compare" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">⚡ Algorithm Comparison</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800 mt-4">
+                <table class="min-w-full text-xs font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-3 py-2 text-left">Algorithm</th><th class="px-3 py-2 text-left">Type</th><th class="px-3 py-2 text-left">Best For</th><th class="px-3 py-2 text-left">Pros</th><th class="px-3 py-2 text-left">Cons</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-3 py-2 text-day2">Logistic Regression</td><td class="px-3 py-2">Classification</td><td class="px-3 py-2">Binary/Multi-class</td><td class="px-3 py-2 text-accent">Probabilistic, Fast</td><td class="px-3 py-2 text-red-400">Linear only</td></tr>
+                        <tr><td class="px-3 py-2 text-day3">Decision Tree</td><td class="px-3 py-2">Both</td><td class="px-3 py-2">Interpretable</td><td class="px-3 py-2 text-accent">White-box, No scaling</td><td class="px-3 py-2 text-red-400">Overfitting</td></tr>
+                        <tr><td class="px-3 py-2 text-day6">Random Forest</td><td class="px-3 py-2">Both</td><td class="px-3 py-2">High accuracy</td><td class="px-3 py-2 text-accent">Robust, Feature importance</td><td class="px-3 py-2 text-red-400">Black-box, Memory</td></tr>
+                        <tr><td class="px-3 py-2 text-day7">SVM</td><td class="px-3 py-2">Classification</td><td class="px-3 py-2">Non-linear</td><td class="px-3 py-2 text-accent">Kernel trick, Memory</td><td class="px-3 py-2 text-red-400">Slow for large data</td></tr>
+                        <tr><td class="px-3 py-2 text-day4">KNN</td><td class="px-3 py-2">Both</td><td class="px-3 py-2">Simple baseline</td><td class="px-3 py-2 text-accent">No training, Intuitive</td><td class="px-3 py-2 text-red-400">Slow prediction</td></tr>
+                        <tr><td class="px-3 py-2 text-day8">Naive Bayes</td><td class="px-3 py-2">Classification</td><td class="px-3 py-2">Text data</td><td class="px-3 py-2 text-accent">Fast, Small data</td><td class="px-3 py-2 text-red-400">Naive assumption</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Congratulations -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-gradient-to-r from-primary/10 via-secondary/5 to-accent/10 rounded-xl p-8 border border-gray-700 text-center">
+                <i data-lucide="trophy" class="w-16 h-16 text-accent mx-auto mb-4"></i>
+                <h2 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">🎉 Congratulations! You've Completed 25 Days of ML!</h2>
+                <p class="text-gray-300 mt-4 max-w-2xl mx-auto">From Data Science fundamentals to advanced algorithms like PCA and Clustering. You've built a strong foundation in Machine Learning!</p>
+                <div class="flex justify-center gap-4 mt-6 flex-wrap">
+                    <span class="px-4 py-2 bg-dark/50 rounded-lg text-sm">✅ 25 Days Completed</span>
+                    <span class="px-4 py-2 bg-dark/50 rounded-lg text-sm">✅ 10+ Algorithms Learned</span>
+                    <span class="px-4 py-2 bg-dark/50 rounded-lg text-sm">✅ 100+ Code Snippets</span>
+                </div>
+                <p class="text-sm text-gray-500 mt-6 font-mono">“The journey of a thousand miles begins with a single step.” — Lao Tzu</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 26 · Complete ML Revision · 25 Days of Data Science & Machine Learning</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const textSequence = "🎯 Complete revision of all 25 days completed! You're now ready for real-world ML projects...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+
+        // Animate progress bars on scroll
+        const progressObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    const fill = entry.target.querySelector('.progress-fill');
+                    if(fill) {
+                        const width = fill.style.width;
+                        fill.style.width = '0%';
+                        setTimeout(() => {
+                            fill.style.width = width;
+                        }, 100);
+                    }
+                }
+            });
+        }, { threshold: 0.3 });
+
+        document.querySelectorAll('.progress-bar').forEach(el => progressObserver.observe(el));
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day26&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+  </html>
