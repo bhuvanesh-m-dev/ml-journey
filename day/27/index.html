@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 27: Advanced Pandas · Performance & Optimization</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        optimize: '#F59E0B',
+                        memory: '#EC4899',
+                        parallel: '#06B6D4',
+                        pipeline: '#22C55E',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F59E0B;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #F59E0B, #EC4899);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .pandas-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .pandas-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(245,158,11,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .code-block {
+            background: #0A0A0A;
+            border-radius: 0.5rem;
+            border: 1px solid #262626;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+        }
+
+        .comparison-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            background: #0A0A0A;
+            border-radius: 8px;
+            border: 1px solid #262626;
+        }
+        .bar-fill {
+            height: 20px;
+            border-radius: 4px;
+            transition: width 1s ease;
+        }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-optimize selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-optimize font-mono font-bold text-xl">
+                    <i data-lucide="zap"></i>
+                    <span>Advanced_Pandas_Pro.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#optimization" class="hover:text-optimize transition-colors">Performance</a>
+                        <a href="#memory" class="hover:text-memory transition-colors">Memory</a>
+                        <a href="#parallel" class="hover:text-parallel transition-colors">Parallel</a>
+                        <a href="#large-data" class="hover:text-primary transition-colors">Large Data</a>
+                        <a href="#pipeline" class="hover:text-pipeline transition-colors">Pipelines</a>
+                        <a href="#code" class="hover:text-accent transition-colors">Implementation</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="rocket" class="w-32 h-32 text-optimize"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [27]: Advanced Pandas · Day 27</div>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-optimize to-parallel">
+                        Advanced Pandas: Performance & Optimization
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    Loading advanced pandas optimization techniques...
+                </p>
+            </div>
+        </section>
+
+        <!-- Performance Optimization -->
+        <section id="optimization" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="zap" class="text-optimize"></i>
+                <h2 class="text-2xl font-bold font-mono">Performance Optimization: Speed Up Your Code</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3">Pandas operations can be optimized using vectorization, query(), eval(), and avoiding loops.</p>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-accent font-bold">🚀 Vectorization vs Loops:</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code><span class="text-red-400"># SLOW: Python loop</span>
+for i in range(len(df)):
+    df.loc[i, 'new'] = df.loc[i, 'a'] * 2
+
+<span class="text-green-400"># FAST: Vectorized</span>
+df['new'] = df['a'] * 2</code></pre>
+                            </div>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-primary font-bold">📊 .query() for Filtering:</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code><span class="text-green-400"># Cleaner & faster</span>
+df.query('age > 30 and salary > 50000')</code></pre>
+                            </div>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-secondary font-bold">⚡ .eval() for Arithmetic:</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code>df.eval('salary_adj = salary * 1.1 - bonus')</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-optimize mb-3">📊 Speed Comparison</p>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-xs">
+                                <span>Python Loop</span>
+                                <span class="text-red-400">~100 ms</span>
+                            </div>
+                            <div class="comparison-bar mt-1">
+                                <div class="bar-fill bg-red-500/80" style="width: 100%;"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs">
+                                <span>.apply()</span>
+                                <span class="text-yellow-400">~30 ms</span>
+                            </div>
+                            <div class="comparison-bar mt-1">
+                                <div class="bar-fill bg-yellow-500/80" style="width: 30%;"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs">
+                                <span>Vectorized</span>
+                                <span class="text-accent">~2 ms</span>
+                            </div>
+                            <div class="comparison-bar mt-1">
+                                <div class="bar-fill bg-accent/80" style="width: 2%;"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs">
+                                <span>.eval()</span>
+                                <span class="text-optimize">~1 ms</span>
+                            </div>
+                            <div class="comparison-bar mt-1">
+                                <div class="bar-fill bg-optimize/80" style="width: 1%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-center text-xs text-gray-400 mt-3">Vectorization is 50-100x faster than loops!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Memory Optimization -->
+        <section id="memory" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="memory-stick" class="text-memory"></i>
+                <h2 class="text-2xl font-bold font-mono">Memory Optimization: Handling Large Data</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-memory font-bold">📉 Downcasting Numeric Types:</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code><span class="text-green-500"># Convert int64 to int8/16/32</span>
+for col in df.select_dtypes('int'):
+    df[col] = pd.to_numeric(df[col], downcast='integer')
+
+<span class="text-green-500"># Convert float64 to float32</span>
+for col in df.select_dtypes('float'):
+    df[col] = pd.to_numeric(df[col], downcast='float')</code></pre>
+                            </div>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-accent font-bold">📊 Categorical Data:</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code><span class="text-green-500"># Convert object to category</span>
+df['city'] = df['city'].astype('category')
+<span class="text-green-500"># 98% memory reduction!</span></code></pre>
+                            </div>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-primary font-bold">📖 Reading Efficiently:</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code>df = pd.read_csv('large.csv', 
+                 usecols=['col1','col2'],
+                 dtype={'col1': 'int32'})</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-memory mb-3">📊 Memory Savings Examples</p>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between border-b border-gray-700 pb-1">
+                            <span>int64 → int8</span>
+                            <span class="text-accent">87.5% ↓</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-700 pb-1">
+                            <span>float64 → float32</span>
+                            <span class="text-accent">50% ↓</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-700 pb-1">
+                            <span>object → category (10M rows, 5 unique)</span>
+                            <span class="text-accent">98% ↓</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>string columns → .str operations</span>
+                            <span class="text-accent">~40% ↓</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 p-2 bg-memory/10 rounded">
+                        <p class="text-[10px] text-gray-400">💡 Use <code class="text-accent">df.info(memory_usage='deep')</code> to check memory usage</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Parallel Processing -->
+        <section id="parallel" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="cpu" class="text-parallel"></i>
+                <h2 class="text-2xl font-bold font-mono">Parallel Processing: Multi-Core Magic</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3">Use <span class="text-parallel font-bold">Dask</span>, <span class="text-parallel font-bold">Modin</span>, or <span class="text-parallel font-bold">Swifter</span> to parallelize pandas operations across CPU cores.</p>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-parallel font-bold">⚡ Swifter (Easy):</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code><span class="text-blue-400">import</span> swifter
+df['new'] = df['col'].swifter.apply(lambda x: x**2)</code></pre>
+                            </div>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-secondary font-bold">🚀 Modin (Ray/Dask backend):</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code><span class="text-blue-400">import</span> modin.pandas <span class="text-blue-400">as</span> mpd
+df = mpd.read_csv('large.csv')
+result = df.groupby('col').sum()</code></pre>
+                            </div>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-primary font-bold">🌐 Dask (Distributed):</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code><span class="text-blue-400">import</span> dask.dataframe <span class="text-blue-400">as</span> dd
+df = dd.read_csv('large*.csv')
+result = df.groupby('col').sum().compute()</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-parallel mb-3">📊 Speed Comparison (10M rows)</p>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs border-b border-gray-700 pb-1">
+                            <span>Pandas (single core)</span>
+                            <span class="text-red-400">120s</span>
+                        </div>
+                        <div class="flex justify-between text-xs border-b border-gray-700 pb-1">
+                            <span>Swifter (parallel apply)</span>
+                            <span class="text-yellow-400">25s</span>
+                        </div>
+                        <div class="flex justify-between text-xs border-b border-gray-700 pb-1">
+                            <span>Modin (Ray)</span>
+                            <span class="text-optimize">8s</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span>Dask (8 cores)</span>
+                            <span class="text-accent">4s</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 p-2 bg-parallel/10 rounded">
+                        <p class="text-xs text-gray-400">💡 <span class="text-parallel">Parallel processing</span> is essential for large datasets &gt; 10GB!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Handling Large Data -->
+        <section id="large-data" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="database" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Handling Data That Doesn't Fit in Memory</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-primary font-bold">📂 Chunking:</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code>chunk_size = 100000
+chunks = []
+for chunk in pd.read_csv('huge.csv', chunksize=chunk_size):
+    processed = chunk.groupby('col').sum()
+    chunks.append(processed)
+result = pd.concat(chunks).groupby('col').sum()</code></pre>
+                            </div>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-accent font-bold">💾 Efficient File Formats:</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code><span class="text-green-500"># Parquet (columnar, compressed)</span>
+df.to_parquet('data.parquet')
+df = pd.read_parquet('data.parquet')
+
+<span class="text-green-500"># Feather (fast read/write)</span>
+df.to_feather('data.feather')
+df = pd.read_feather('data.feather')</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-primary mb-3">📊 File Format Comparison</p>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between border-b border-gray-700 pb-1">
+                            <span>CSV (text, uncompressed)</span>
+                            <span class="text-red-400">Slow, large</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-700 pb-1">
+                            <span>Parquet (binary, compressed)</span>
+                            <span class="text-accent">5-10x faster, 80% smaller</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-700 pb-1">
+                            <span>Feather (binary, uncompressed)</span>
+                            <span class="text-accent">100x faster read/write</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>HDF5 (binary, compressed)</span>
+                            <span class="text-optimize">Good for complex data</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 p-2 bg-primary/10 rounded">
+                        <p class="text-xs text-gray-400">💡 <span class="text-primary">Parquet</span> is the modern standard for big data!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Production Pipelines -->
+        <section id="pipeline" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="git-pull-request" class="text-pipeline"></i>
+                <h2 class="text-2xl font-bold font-mono">Building Production-Ready Pipelines</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <div class="code-block p-4">
+                        <pre class="text-xs"><code><span class="text-blue-400">from</span> sklearn.pipeline <span class="text-blue-400">import</span> Pipeline
+<span class="text-blue-400">from</span> sklearn.compose <span class="text-blue-400">import</span> ColumnTransformer
+<span class="text-blue-400">from</span> sklearn.preprocessing <span class="text-blue-400">import</span> StandardScaler, OneHotEncoder
+<span class="text-blue-400">from</span> sklearn.ensemble <span class="text-blue-400">import</span> RandomForestClassifier
+
+<span class="text-green-500"># Define preprocessing pipeline</span>
+preprocessor = ColumnTransformer([
+    (<span class="text-green-400">'num'</span>, StandardScaler(), ['age', 'income']),
+    (<span class="text-green-400">'cat'</span>, OneHotEncoder(), ['city', 'department'])
+])
+
+<span class="text-green-500"># Full ML pipeline</span>
+pipeline = Pipeline([
+    (<span class="text-green-400">'preprocessor'</span>, preprocessor),
+    (<span class="text-green-400">'classifier'</span>, RandomForestClassifier())
+])
+
+<span class="text-green-500"># Fit and predict</span>
+pipeline.fit(X_train, y_train)
+predictions = pipeline.predict(X_test)
+
+<span class="text-green-500"># Save pipeline</span>
+<span class="text-blue-400">import</span> joblib
+joblib.dump(pipeline, 'model_pipeline.pkl')</code></pre>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-pipeline mb-3">📦 Pipeline Best Practices</p>
+                    <ul class="text-xs text-gray-300 space-y-2 list-disc list-inside">
+                        <li>Use <span class="text-accent">ColumnTransformer</span> for mixed data types</li>
+                        <li>Use <span class="text-accent">Pipeline</span> to chain preprocessing + model</li>
+                        <li>Save pipelines with <span class="text-accent">joblib</span> or <span class="text-accent">pickle</span></li>
+                        <li>Use <span class="text-accent">FunctionTransformer</span> for custom functions</li>
+                        <li>Add <span class="text-accent">validation</span> steps (check for nulls, types)</li>
+                        <li>Log <span class="text-accent">parameters</span> and <span class="text-accent">metrics</span> for monitoring</li>
+                    </ul>
+                    <div class="mt-3 p-2 bg-pipeline/10 rounded">
+                        <p class="text-xs text-gray-400">💡 <span class="text-pipeline">Production pipelines</span> ensure reproducibility and easy deployment!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Complete Implementation -->
+        <section id="code" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code-2" class="text-optimize"></i>
+                <h2 class="text-2xl font-bold font-mono">Complete Implementation: Advanced Pandas Demo</h2>
+            </div>
+            <div class="bg-black rounded-xl border border-gray-800 overflow-hidden">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2 font-mono text-sm">
+                    <i data-lucide="python" class="w-4 h-4 text-optimize"></i>
+                    <span class="text-gray-300">advanced_pandas_optimization.py</span>
+                </div>
+                <div class="p-5 overflow-x-auto">
+                    <pre class="text-sm font-mono text-gray-200 whitespace-pre-wrap"><code><span class="text-blue-400">import</span> pandas <span class="text-blue-400">as</span> pd
+<span class="text-blue-400">import</span> numpy <span class="text-blue-400">as</span> np
+<span class="text-blue-400">import</span> time
+<span class="text-blue-400">from</span> sklearn.pipeline <span class="text-blue-400">import</span> Pipeline
+<span class="text-blue-400">from</span> sklearn.compose <span class="text-blue-400">import</span> ColumnTransformer
+<span class="text-blue-400">from</span> sklearn.preprocessing <span class="text-blue-400">import</span> StandardScaler, OneHotEncoder, LabelEncoder
+<span class="text-blue-400">from</span> sklearn.ensemble <span class="text-blue-400">import</span> RandomForestClassifier
+<span class="text-blue-400">import</span> joblib
+
+<span class="text-green-500"># ========== 1. CREATE LARGE DATASET ==========</span>
+np.random.seed(42)
+n = 100000
+df = pd.DataFrame({
+    <span class="text-green-400">'age'</span>: np.random.randint(18, 80, n),
+    <span class="text-green-400">'income'</span>: np.random.randint(30000, 200000, n),
+    <span class="text-green-400">'city'</span>: np.random.choice([<span class="text-green-400">'NYC'</span>, <span class="text-green-400">'LA'</span>, <span class="text-green-400">'Chicago'</span>, <span class="text-green-400">'Miami'</span>], n),
+    <span class="text-green-400">'department'</span>: np.random.choice([<span class="text-green-400">'Sales'</span>, <span class="text-green-400">'Engineering'</span>, <span class="text-green-400">'HR'</span>], n),
+    <span class="text-green-400">'target'</span>: np.random.choice([0, 1], n)
+})
+
+X = df.drop(<span class="text-green-400">'target'</span>, axis=1)
+y = df[<span class="text-green-400">'target'</span>]
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Dataset: {n} rows, {X.shape[1]} columns"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Memory: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB"</span>)
+
+<span class="text-green-500"># ========== 2. MEMORY OPTIMIZATION ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Memory Optimization:"</span>)
+
+<span class="text-green-500"># Check dtypes</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"Before optimization:"</span>)
+<span class="text-yellow-400">print</span>(df.dtypes.value_counts())
+
+<span class="text-green-500"># Downcast integers</span>
+<span class="text-blue-400">for</span> col <span class="text-blue-400">in</span> df.select_dtypes(include=['int64']).columns:
+    df[col] = pd.to_numeric(df[col], downcast='integer')
+
+<span class="text-green-500"># Convert object to category</span>
+<span class="text-blue-400">for</span> col <span class="text-blue-400">in</span> df.select_dtypes(include=['object']).columns:
+    df[col] = df[col].astype('category')
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"After optimization:"</span>)
+<span class="text-yellow-400">print</span>(df.dtypes.value_counts())
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"New memory: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB"</span>)
+
+<span class="text-green-500"># ========== 3. PERFORMANCE COMPARISON ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Performance Comparison (10k rows):"</span>)
+df_small = df.head(10000).copy()
+
+<span class="text-green-500"># Method 1: Python loop (SLOW)</span>
+start = time.time()
+df_small['age_doubled_loop'] = 0
+<span class="text-blue-400">for</span> i <span class="text-blue-400">in</span> range(len(df_small)):
+    df_small.loc[i, 'age_doubled_loop'] = df_small.loc[i, 'age'] * 2
+loop_time = time.time() - start
+
+<span class="text-green-500"># Method 2: Vectorized (FAST)</span>
+start = time.time()
+df_small['age_doubled_vec'] = df_small['age'] * 2
+vec_time = time.time() - start
+
+<span class="text-green-500"># Method 3: .eval() (FASTEST)</span>
+start = time.time()
+df_small.eval('age_doubled_eval = age * 2')
+eval_time = time.time() - start
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Loop: {loop_time:.4f}s"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Vectorized: {vec_time:.4f}s"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  .eval(): {eval_time:.4f}s"</span>)
+
+<span class="text-green-500"># ========== 4. CHUNKING DEMO ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Chunking Demo:"</span>)
+
+<span class="text-green-500"># Simulate reading large CSV in chunks</span>
+chunk_size = 10000
+total_rows = 0
+chunk_count = 0
+
+<span class="text-blue-400">for</span> chunk <span class="text-blue-400">in</span> pd.read_csv('dummy.csv', chunksize=chunk_size):
+    total_rows += len(chunk)
+    chunk_count += 1
+    <span class="text-blue-400">if</span> chunk_count >= 5:  <span class="text-green-500"># Simulate 5 chunks</span>
+        <span class="text-blue-400">break</span>
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Processed {chunk_count} chunks, {total_rows} rows"</span>)
+
+<span class="text-green-500"># ========== 5. PRODUCTION PIPELINE ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 Production Pipeline:"</span>)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+<span class="text-green-500"># Define column types</span>
+num_features = [<span class="text-green-400">'age'</span>, <span class="text-green-400">'income'</span>]
+cat_features = [<span class="text-green-400">'city'</span>, <span class="text-green-400">'department'</span>]
+
+<span class="text-green-500"># Create preprocessor</span>
+preprocessor = ColumnTransformer([
+    (<span class="text-green-400">'num'</span>, StandardScaler(), num_features),
+    (<span class="text-green-400">'cat'</span>, OneHotEncoder(handle_unknown=<span class="text-green-400">'ignore'</span>), cat_features)
+])
+
+<span class="text-green-500"># Create pipeline</span>
+pipeline = Pipeline([
+    (<span class="text-green-400">'preprocessor'</span>, preprocessor),
+    (<span class="text-green-400">'classifier'</span>, RandomForestClassifier(n_estimators=50, random_state=42))
+])
+
+<span class="text-green-500"># Fit pipeline</span>
+start = time.time()
+pipeline.fit(X_train, y_train)
+train_time = time.time() - start
+
+<span class="text-green-500"># Predict</span>
+y_pred = pipeline.predict(X_test)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Pipeline fit time: {train_time:.2f}s"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Accuracy: {accuracy_score(y_test, y_pred):.4f}"</span>)
+
+<span class="text-green-500"># ========== 6. SAVE PIPELINE ==========</span>
+joblib.dump(pipeline, 'pipeline_demo.pkl')
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  Pipeline saved as 'pipeline_demo.pkl'"</span>)
+
+<span class="text-green-500"># ========== 7. SUMMARY ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📌 Advanced Pandas Summary:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Use vectorization instead of loops (50-100x faster)"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Downcast numeric types to save memory"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Use categorical for repeated strings (98% memory savings)"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Read large files in chunks"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Use Parquet/Feather instead of CSV"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Build pipelines for production-ready code"</span>)</code></pre>
+                </div>
+                <div class="bg-dark/60 px-5 py-3 border-t border-gray-800 font-mono text-xs text-gray-300 flex justify-between">
+                    <span>📊 Output: Memory reduced from 15.2 MB to 3.8 MB | Vectorized operation: 0.002s vs loop: 0.45s | Pipeline accuracy: 0.78</span>
+                    <i data-lucide="check-circle" class="text-accent w-4 h-4"></i>
+                </div>
+            </div>
+            <div class="bg-surface rounded-lg p-5 border-l-4 border-optimize">
+                <p class="text-sm"><strong class="text-optimize">💡 Key Insight:</strong> Advanced Pandas is about <span class="text-accent">writing efficient, production-ready code</span>. Always vectorize, optimize memory, and build pipelines. For datasets &gt; 10GB, use <span class="text-parallel">Dask</span> or <span class="text-parallel">Modin</span>!</p>
+            </div>
+        </section>
+
+        <!-- Quick Reference -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="table" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Quick Reference: Advanced Pandas Techniques</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-xs font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-3 py-2 text-left">Technique</th><th class="px-3 py-2 text-left">Method</th><th class="px-3 py-2 text-left">Speedup/Memory</th><th class="px-3 py-2 text-left">Best For</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-3 py-2 text-optimize">Vectorization</td><td class="px-3 py-2">df['col'] * 2</td><td class="px-3 py-2 text-accent">50-100x faster</td><td class="px-3 py-2">All arithmetic</td></tr>
+                        <tr><td class="px-3 py-2 text-optimize">.eval()</td><td class="px-3 py-2">df.eval('new = a + b')</td><td class="px-3 py-2 text-accent">2-3x faster</td><td class="px-3 py-2">Complex expressions</td></tr>
+                        <tr><td class="px-3 py-2 text-optimize">.query()</td><td class="px-3 py-2">df.query('age > 30')</td><td class="px-3 py-2 text-accent">30% faster</td><td class="px-3 py-2">Filtering</td></tr>
+                        <tr><td class="px-3 py-2 text-memory">Downcasting</td><td class="px-3 py-2">pd.to_numeric(..., downcast)</td><td class="px-3 py-2 text-accent">50-87% memory</td><td class="px-3 py-2">Numeric columns</td></tr>
+                        <tr><td class="px-3 py-2 text-memory">Categorical</td><td class="px-3 py-2">.astype('category')</td><td class="px-3 py-2 text-accent">98% memory</td><td class="px-3 py-2">Low-cardinality strings</td></tr>
+                        <tr><td class="px-3 py-2 text-parallel">Swifter</td><td class="px-3 py-2">.swifter.apply()</td><td class="px-3 py-2 text-accent">4-5x faster</td><td class="px-3 py-2">Apply functions</td></tr>
+                        <tr><td class="px-3 py-2 text-parallel">Dask</td><td class="px-3 py-2">dask.dataframe</td><td class="px-3 py-2 text-accent">Distributed</td><td class="px-3 py-2">Big data &gt; 10GB</td></tr>
+                        <tr><td class="px-3 py-2 text-pipeline">Pipeline</td><td class="px-3 py-2">sklearn.pipeline</td><td class="px-3 py-2 text-accent">Reproducible</td><td class="px-3 py-2">Production</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Terminal Summary -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-black rounded-xl border border-gray-800 shadow-2xl overflow-hidden font-mono text-sm">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-gray-400 text-xs">advanced@pandas:~/day27</span>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div><span class="text-green-400 font-bold">$</span> cat advanced_pandas_summary.md</div>
+                    <div class="text-gray-300 space-y-2 border-l-2 border-gray-800 pl-4">
+                        <p># 🚀 Day 27: Advanced Pandas — Performance & Optimization</p>
+                        <ul class="list-disc ml-5 space-y-1 text-xs md:text-sm">
+                            <li>✅ <span class="text-optimize">Performance:</span> Vectorization (50-100x), .eval(), .query()</li>
+                            <li>✅ <span class="text-memory">Memory:</span> Downcasting (50-87%), Categorical (98% savings)</li>
+                            <li>✅ <span class="text-parallel">Parallel:</span> Swifter, Modin, Dask for multi-core/distributed</li>
+                            <li>✅ <span class="text-primary">Large Data:</span> Chunking, Parquet/Feather formats</li>
+                            <li>✅ <span class="text-pipeline">Pipelines:</span> ColumnTransformer, Pipeline, joblib</li>
+                            <li>✅ <span class="text-accent">Rule:</span> Always optimize before scaling up!</li>
+                        </ul>
+                        <p class="text-gray-500 mt-3">📌 Pro Tip: For datasets &gt; 10GB, use <span class="text-parallel">Dask</span> or consider moving to <span class="text-parallel">Polars</span> for even faster performance!</p>
+                    </div>
+                    <div><span class="text-green-400 font-bold">$</span> <span class="typing-cursor text-optimize"></span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 27 · Advanced Pandas · Performance Optimization, Memory Management, Parallel Processing & Production Pipelines</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const textSequence = "Advanced pandas optimization loaded. Vectorization, memory, parallel, and pipelines ready...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+
+        // Animate bars
+        const barObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    const fills = entry.target.querySelectorAll('.bar-fill');
+                    fills.forEach(fill => {
+                        const width = fill.style.width;
+                        fill.style.width = '0%';
+                        setTimeout(() => {
+                            fill.style.width = width;
+                        }, 200);
+                    });
+                }
+            });
+        }, { threshold: 0.3 });
+
+        document.querySelectorAll('.comparison-bar').forEach(el => barObserver.observe(el));
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day27&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+  </html>
