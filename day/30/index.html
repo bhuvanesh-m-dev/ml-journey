@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 30: Cross-Validation · Complete Guide</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        cv: '#F59E0B',
+                        kfold: '#EC4899',
+                        stratified: '#06B6D4',
+                        loocv: '#22C55E',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'slide': 'slide 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                        slide: {
+                            '0%': { transform: 'translateX(-20px)', opacity: '0' },
+                            '100%': { transform: 'translateX(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F59E0B;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #F59E0B, #EC4899);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .cv-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .cv-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(245,158,11,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .code-block {
+            background: #0A0A0A;
+            border-radius: 0.5rem;
+            border: 1px solid #262626;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+        }
+
+        .fold-visual {
+            display: flex;
+            gap: 4px;
+            padding: 8px;
+            background: #0A0A0A;
+            border-radius: 8px;
+            border: 1px solid #262626;
+        }
+        .fold-block {
+            height: 40px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 600;
+            color: white;
+            flex: 1;
+        }
+        .fold-train { background: rgba(56,189,248,0.4); }
+        .fold-test { background: rgba(239,68,68,0.5); }
+        .fold-train.active { background: rgba(56,189,248,0.8); }
+        .fold-test.active { background: rgba(239,68,68,0.9); }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-cv selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-cv font-mono font-bold text-xl">
+                    <i data-lucide="refresh-ccw"></i>
+                    <span>Cross_Validation_Complete.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#why-cv" class="hover:text-cv transition-colors">Why CV?</a>
+                        <a href="#kfold" class="hover:text-kfold transition-colors">K-Fold</a>
+                        <a href="#stratified" class="hover:text-stratified transition-colors">Stratified</a>
+                        <a href="#advanced" class="hover:text-primary transition-colors">Advanced</a>
+                        <a href="#code" class="hover:text-accent transition-colors">Implementation</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="refresh-ccw" class="w-32 h-32 text-cv"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [30]: Cross-Validation · Day 30</div>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-cv to-stratified">
+                        Cross-Validation: Complete Guide
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    Mastering cross-validation techniques for robust model evaluation...
+                </p>
+                <div class="mt-6 flex flex-wrap gap-3">
+                    <span class="px-3 py-1 bg-cv/20 text-cv rounded-full text-xs font-mono">🔄 K-Fold</span>
+                    <span class="px-3 py-1 bg-stratified/20 text-stratified rounded-full text-xs font-mono">📊 Stratified</span>
+                    <span class="px-3 py-1 bg-kfold/20 text-kfold rounded-full text-xs font-mono">🔬 LOOCV</span>
+                    <span class="px-3 py-1 bg-primary/20 text-primary rounded-full text-xs font-mono">⏱️ Time Series</span>
+                    <span class="px-3 py-1 bg-accent/20 text-accent rounded-full text-xs font-mono">📈 Repeated</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Why Cross-Validation? -->
+        <section id="why-cv" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="help-circle" class="text-cv"></i>
+                <h2 class="text-2xl font-bold font-mono">Why Cross-Validation?</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <p class="text-gray-300 text-sm mb-4"><span class="text-cv font-bold">Cross-Validation (CV)</span> is a resampling technique used to evaluate machine learning models on a limited data sample.</p>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-accent font-bold">🎯 Why use CV?</span>
+                            <ul class="text-xs text-gray-300 list-disc list-inside mt-1">
+                                <li>Better estimate of model performance</li>
+                                <li>Reduces overfitting</li>
+                                <li>Maximizes use of available data</li>
+                                <li>Helps with hyperparameter tuning</li>
+                            </ul>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-primary font-bold">📊 Single Split vs CV</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code><span class="text-red-400"># Single Split (high variance)</span>
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+<span class="text-green-400"># Cross-Validation (more robust)</span>
+scores = cross_val_score(model, X, y, cv=5)</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-cv mb-3">📊 Single Split vs CV</p>
+                    <div class="space-y-3">
+                        <div class="text-xs">
+                            <p class="text-gray-400 mb-1">Single Split (80-20):</p>
+                            <div class="fold-visual">
+                                <div class="fold-block fold-train" style="flex: 4;">Train</div>
+                                <div class="fold-block fold-test" style="flex: 1;">Test</div>
+                            </div>
+                            <p class="text-[10px] text-gray-500 mt-1">Only one evaluation → high variance</p>
+                        </div>
+                        <div class="text-xs">
+                            <p class="text-gray-400 mb-1">5-Fold CV:</p>
+                            <div class="fold-visual">
+                                <div class="fold-block fold-train">Train</div>
+                                <div class="fold-block fold-train">Train</div>
+                                <div class="fold-block fold-train">Train</div>
+                                <div class="fold-block fold-train">Train</div>
+                                <div class="fold-block fold-test">Test</div>
+                            </div>
+                            <div class="fold-visual mt-1">
+                                <div class="fold-block fold-train">Train</div>
+                                <div class="fold-block fold-train">Train</div>
+                                <div class="fold-block fold-train">Train</div>
+                                <div class="fold-block fold-test">Test</div>
+                                <div class="fold-block fold-train">Train</div>
+                            </div>
+                            <div class="fold-visual mt-1">
+                                <div class="fold-block fold-train">Train</div>
+                                <div class="fold-block fold-train">Train</div>
+                                <div class="fold-block fold-test">Test</div>
+                                <div class="fold-block fold-train">Train</div>
+                                <div class="fold-block fold-train">Train</div>
+                            </div>
+                            <p class="text-[10px] text-gray-500 mt-1">Multiple evaluations → more reliable</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 p-2 bg-cv/10 rounded">
+                        <p class="text-xs text-gray-400">💡 <span class="text-cv">Cross-Validation</span> gives a more stable estimate of model performance!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- K-Fold Cross-Validation -->
+        <section id="kfold" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="grid-3x3" class="text-kfold"></i>
+                <h2 class="text-2xl font-bold font-mono">🔄 K-Fold Cross-Validation</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3"><span class="text-kfold font-bold">K-Fold CV</span> splits data into K equal-sized folds. Each fold serves as test set once, while the remaining K-1 folds are used for training.</p>
+                    <div class="code-block p-4">
+                        <pre class="text-xs"><code><span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> KFold, cross_val_score
+
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+scores = cross_val_score(model, X, y, cv=kf, scoring='accuracy')
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"CV Scores: {scores}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Mean: {scores.mean():.4f} ± {scores.std():.4f}"</span>)</code></pre>
+                    </div>
+                    <div class="mt-3 p-3 bg-kfold/10 rounded-lg">
+                        <p class="text-xs"><span class="text-kfold font-bold">📌 K-Fold Rules:</span></p>
+                        <ul class="text-xs text-gray-300 list-disc list-inside mt-1">
+                            <li>K=5 or K=10 are most common</li>
+                            <li>Larger K = less bias, more variance</li>
+                            <li>Always shuffle data before splitting</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-kfold mb-3">📊 5-Fold CV Visualization</p>
+                    <div class="space-y-2">
+                        <div class="fold-visual">
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-test active">Test</div>
+                        </div>
+                        <div class="fold-visual">
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-test active">Test</div>
+                            <div class="fold-block fold-train active">Train</div>
+                        </div>
+                        <div class="fold-visual">
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-test active">Test</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                        </div>
+                        <div class="fold-visual">
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-test active">Test</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                        </div>
+                        <div class="fold-visual">
+                            <div class="fold-block fold-test active">Test</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                            <div class="fold-block fold-train active">Train</div>
+                        </div>
+                    </div>
+                    <p class="text-center text-xs text-gray-400 mt-2">Each fold becomes test set once</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stratified K-Fold -->
+        <section id="stratified" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="layers" class="text-stratified"></i>
+                <h2 class="text-2xl font-bold font-mono">📊 Stratified K-Fold</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3"><span class="text-stratified font-bold">Stratified K-Fold</span> preserves the class distribution in each fold. Essential for <span class="text-accent">imbalanced datasets</span>.</p>
+                    <div class="code-block p-4">
+                        <pre class="text-xs"><code><span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> StratifiedKFold
+
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+scores = cross_val_score(model, X, y, cv=skf)
+
+<span class="text-green-500"># Check class distribution per fold</span>
+<span class="text-blue-400">for</span> train_idx, test_idx <span class="text-blue-400">in</span> skf.split(X, y):
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"Train: {np.bincount(y[train_idx])}"</span>)
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"Test: {np.bincount(y[test_idx])}"</span>)</code></pre>
+                    </div>
+                    <div class="mt-3 p-3 bg-stratified/10 rounded-lg">
+                        <p class="text-xs"><span class="text-stratified font-bold">When to use:</span> Classification problems with imbalanced classes. Always use stratified for classification!</p>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-stratified mb-3">📊 Stratified vs Regular</p>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <p class="text-gray-400">Original: 90% Class A, 10% Class B</p>
+                            <div class="fold-visual mt-1">
+                                <div class="fold-block bg-green-500/40" style="flex: 9;">A</div>
+                                <div class="fold-block bg-red-500/40" style="flex: 1;">B</div>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">Regular K-Fold (may misrepresent)</p>
+                            <div class="fold-visual mt-1">
+                                <div class="fold-block bg-green-500/40" style="flex: 10;">A</div>
+                                <div class="fold-block bg-red-500/40" style="flex: 0;">B</div>
+                            </div>
+                            <p class="text-red-400 text-[10px]">⚠️ Test fold has no B samples!</p>
+                        </div>
+                        <div>
+                            <p class="text-stratified">Stratified K-Fold (preserves ratio)</p>
+                            <div class="fold-visual mt-1">
+                                <div class="fold-block bg-green-500/40" style="flex: 9;">A</div>
+                                <div class="fold-block bg-red-500/40" style="flex: 1;">B</div>
+                            </div>
+                            <p class="text-accent text-[10px]">✅ Test fold preserves 90-10 ratio</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Advanced CV Methods -->
+        <section id="advanced" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="layers" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">🔬 Advanced Cross-Validation Methods</h2>
+            </div>
+            <div class="grid md:grid-cols-3 gap-5">
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 cv-card">
+                    <i data-lucide="user" class="text-loocv w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-loocv">Leave-One-Out (LOOCV)</h3>
+                    <p class="text-xs text-gray-400 mt-1">K = n_samples. Each sample is test set once.</p>
+                    <div class="code-block p-2 mt-2 text-[10px]">
+                        <code>from sklearn.model_selection import LeaveOneOut</code>
+                    </div>
+                    <div class="mt-2 p-2 bg-loocv/10 rounded">
+                        <p class="text-[10px] text-gray-400">✅ Best for small datasets</p>
+                        <p class="text-[10px] text-red-400">❌ Very expensive</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 cv-card">
+                    <i data-lucide="repeat" class="text-kfold w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-kfold">Repeated K-Fold</h3>
+                    <p class="text-xs text-gray-400 mt-1">Run K-Fold multiple times with different shuffles.</p>
+                    <div class="code-block p-2 mt-2 text-[10px]">
+                        <code>from sklearn.model_selection import RepeatedKFold</code>
+                    </div>
+                    <div class="mt-2 p-2 bg-kfold/10 rounded">
+                        <p class="text-[10px] text-gray-400">✅ More stable estimates</p>
+                        <p class="text-[10px] text-yellow-400">⚠️ Computationally heavier</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 cv-card">
+                    <i data-lucide="clock" class="text-primary w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-primary">Time Series Split</h3>
+                    <p class="text-xs text-gray-400 mt-1">Preserves temporal order (no shuffling).</p>
+                    <div class="code-block p-2 mt-2 text-[10px]">
+                        <code>from sklearn.model_selection import TimeSeriesSplit</code>
+                    </div>
+                    <div class="mt-2 p-2 bg-primary/10 rounded">
+                        <p class="text-[10px] text-gray-400">✅ For time series data</p>
+                        <p class="text-[10px] text-red-400">❌ Cannot shuffle</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 cv-card">
+                    <i data-lucide="users" class="text-secondary w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-secondary">Group K-Fold</h3>
+                    <p class="text-xs text-gray-400 mt-1">Ensures groups are kept together.</p>
+                    <div class="code-block p-2 mt-2 text-[10px]">
+                        <code>from sklearn.model_selection import GroupKFold</code>
+                    </div>
+                    <div class="mt-2 p-2 bg-secondary/10 rounded">
+                        <p class="text-[10px] text-gray-400">✅ For grouped data (patients, users)</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 cv-card">
+                    <i data-lucide="shuffle" class="text-cv w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-cv">ShuffleSplit</h3>
+                    <p class="text-xs text-gray-400 mt-1">Random train-test splits repeated n times.</p>
+                    <div class="code-block p-2 mt-2 text-[10px]">
+                        <code>from sklearn.model_selection import ShuffleSplit</code>
+                    </div>
+                    <div class="mt-2 p-2 bg-cv/10 rounded">
+                        <p class="text-[10px] text-gray-400">✅ Flexible, good for large data</p>
+                    </div>
+                </div>
+                <div class="bg-surface p-4 rounded-xl border border-gray-800 cv-card">
+                    <i data-lucide="pie-chart" class="text-accent w-6 h-6 mb-2"></i>
+                    <h3 class="font-bold text-accent">StratifiedShuffleSplit</h3>
+                    <p class="text-xs text-gray-400 mt-1">ShuffleSplit with stratification.</p>
+                    <div class="code-block p-2 mt-2 text-[10px]">
+                        <code>from sklearn.model_selection import StratifiedShuffleSplit</code>
+                    </div>
+                    <div class="mt-2 p-2 bg-accent/10 rounded">
+                        <p class="text-[10px] text-gray-400">✅ Best of both worlds</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Complete Implementation -->
+        <section id="code" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code-2" class="text-cv"></i>
+                <h2 class="text-2xl font-bold font-mono">📝 Complete Implementation: All CV Methods</h2>
+            </div>
+            <div class="bg-black rounded-xl border border-gray-800 overflow-hidden">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2 font-mono text-sm">
+                    <i data-lucide="python" class="w-4 h-4 text-cv"></i>
+                    <span class="text-gray-300">cross_validation_complete.py</span>
+                </div>
+                <div class="p-5 overflow-x-auto">
+                    <pre class="text-sm font-mono text-gray-200 whitespace-pre-wrap"><code><span class="text-blue-400">import</span> numpy <span class="text-blue-400">as</span> np
+<span class="text-blue-400">import</span> pandas <span class="text-blue-400">as</span> pd
+<span class="text-blue-400">from</span> sklearn.datasets <span class="text-blue-400">import</span> load_breast_cancer, make_classification
+<span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> (
+    KFold, StratifiedKFold, LeaveOneOut, LeavePOut,
+    RepeatedKFold, ShuffleSplit, StratifiedShuffleSplit,
+    TimeSeriesSplit, GroupKFold, GroupShuffleSplit,
+    cross_val_score, cross_validate, cross_val_predict,
+    GridSearchCV, RandomizedSearchCV
+)
+<span class="text-blue-400">from</span> sklearn.ensemble <span class="text-blue-400">import</span> RandomForestClassifier
+<span class="text-blue-400">from</span> sklearn.linear_model <span class="text-blue-400">import</span> LogisticRegression
+<span class="text-blue-400">from</span> sklearn.metrics <span class="text-blue-400">import</span> accuracy_score, f1_score, roc_auc_score
+<span class="text-blue-400">from</span> sklearn.preprocessing <span class="text-blue-400">import</span> StandardScaler
+<span class="text-blue-400">import</span> time
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"🔄 CROSS-VALIDATION COMPLETE GUIDE"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"="</span> * 50)
+
+<span class="text-green-500"># Load data</span>
+data = load_breast_cancer()
+X, y = data.data, data.target
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\nDataset: {X.shape[0]} samples, {X.shape[1]} features"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Class distribution: {np.bincount(y)}"</span>)
+
+<span class="text-green-500"># ========== 1. K-FOLD ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 1. K-Fold CV:"</span>)
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+model = RandomForestClassifier(n_estimators=50, random_state=42)
+scores_kf = cross_val_score(model, X, y, cv=kf, scoring='accuracy')
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  K-Fold: {scores_kf.mean():.4f} ± {scores_kf.std():.4f}"</span>)
+
+<span class="text-green-500"># ========== 2. STRATIFIED K-FOLD ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 2. Stratified K-Fold:"</span>)
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+scores_skf = cross_val_score(model, X, y, cv=skf, scoring='accuracy')
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Stratified: {scores_skf.mean():.4f} ± {scores_skf.std():.4f}"</span>)
+
+<span class="text-green-500"># ========== 3. LEAVE-ONE-OUT (LOOCV) ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 3. Leave-One-Out (LOOCV):"</span>)
+<span class="text-green-500"># Only on subset for speed</span>
+X_subset = X[:50]
+y_subset = y[:50]
+loo = LeaveOneOut()
+scores_loo = cross_val_score(model, X_subset, y_subset, cv=loo, scoring='accuracy')
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  LOOCV: {scores_loo.mean():.4f} ± {scores_loo.std():.4f}"</span>)
+
+<span class="text-green-500"># ========== 4. REPEATED K-FOLD ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 4. Repeated K-Fold:"</span>)
+rkf = RepeatedKFold(n_splits=5, n_repeats=3, random_state=42)
+scores_rkf = cross_val_score(model, X, y, cv=rkf, scoring='accuracy')
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Repeated K-Fold: {scores_rkf.mean():.4f} ± {scores_rkf.std():.4f}"</span>)
+
+<span class="text-green-500"># ========== 5. SHUFFLE SPLIT ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 5. Shuffle Split:"</span>)
+ss = ShuffleSplit(n_splits=10, test_size=0.2, random_state=42)
+scores_ss = cross_val_score(model, X, y, cv=ss, scoring='accuracy')
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  ShuffleSplit: {scores_ss.mean():.4f} ± {scores_ss.std():.4f}"</span>)
+
+<span class="text-green-500"># ========== 6. STRATIFIED SHUFFLE SPLIT ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 6. Stratified Shuffle Split:"</span>)
+sss = StratifiedShuffleSplit(n_splits=10, test_size=0.2, random_state=42)
+scores_sss = cross_val_score(model, X, y, cv=sss, scoring='accuracy')
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  StratifiedShuffleSplit: {scores_sss.mean():.4f} ± {scores_sss.std():.4f}"</span>)
+
+<span class="text-green-500"># ========== 7. TIME SERIES SPLIT ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 7. Time Series Split:"</span>)
+tscv = TimeSeriesSplit(n_splits=5)
+X_ts = np.arange(100).reshape(-1, 1)
+y_ts = np.arange(100)
+<span class="text-blue-400">for</span> train_idx, test_idx <span class="text-blue-400">in</span> tscv.split(X_ts):
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Train: {len(train_idx)}, Test: {len(test_idx)}"</span>)
+
+<span class="text-green-500"># ========== 8. CROSS_VALIDATE (Multiple Metrics) ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 8. Cross-Validate with Multiple Metrics:"</span>)
+scoring = ['accuracy', 'f1_macro', 'roc_auc_ovr']
+cv_results = cross_validate(model, X, y, cv=5, scoring=scoring, return_train_score=True)
+
+<span class="text-blue-400">for</span> metric <span class="text-blue-400">in</span> scoring:
+    test_key = <span class="text-green-400">f'test_{metric}'</span>
+    train_key = <span class="text-green-400">f'train_{metric}'</span>
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  {metric}: {cv_results[test_key].mean():.4f} ± {cv_results[test_key].std():.4f}"</span>)
+
+<span class="text-green-500"># ========== 9. CROSS_VAL_PREDICT ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 9. Cross-Validation Predictions:"</span>)
+y_pred_cv = cross_val_predict(model, X, y, cv=5)
+acc_cv_pred = accuracy_score(y, y_pred_cv)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  CV Prediction Accuracy: {acc_cv_pred:.4f}"</span>)
+
+<span class="text-green-500"># ========== 10. GRID SEARCH WITH CV ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 10. GridSearchCV:"</span>)
+param_grid = {
+    'n_estimators': [50, 100],
+    'max_depth': [5, 10, None],
+    'min_samples_split': [2, 5]
+}
+grid = GridSearchCV(RandomForestClassifier(random_state=42), param_grid, cv=5, scoring='accuracy')
+grid.fit(X, y)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best params: {grid.best_params_}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best score: {grid.best_score_:.4f}"</span>)
+
+<span class="text-green-500"># ========== 11. RANDOMIZED SEARCH ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 11. RandomizedSearchCV:"</span>)
+<span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> RandomizedSearchCV
+random_search = RandomizedSearchCV(
+    RandomForestClassifier(random_state=42),
+    param_distributions=param_grid,
+    n_iter=10,
+    cv=5,
+    random_state=42
+)
+random_search.fit(X, y)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best params: {random_search.best_params_}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best score: {random_search.best_score_:.4f}"</span>)
+
+<span class="text-green-500"># ========== 12. COMPARISON TABLE ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 12. Method Comparison:"</span>)
+methods = {
+    'KFold': scores_kf.mean(),
+    'StratifiedKFold': scores_skf.mean(),
+    'RepeatedKFold': scores_rkf.mean(),
+    'ShuffleSplit': scores_ss.mean(),
+    'StratifiedShuffleSplit': scores_sss.mean()
+}
+<span class="text-blue-400">for</span> name, score <span class="text-blue-400">in</span> sorted(methods.items(), key=lambda x: x[1], reverse=True):
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  {name}: {score:.4f}"</span>)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📌 Cross-Validation Summary:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ K-Fold: Standard choice"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Stratified: For classification (imbalanced)"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ LOOCV: For small datasets"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Repeated K-Fold: More stable estimates"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ TimeSeriesSplit: For temporal data"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ GroupKFold: For grouped data"</span>)</code></pre>
+                </div>
+                <div class="bg-dark/60 px-5 py-3 border-t border-gray-800 font-mono text-xs text-gray-300 flex justify-between">
+                    <span>📊 Output: K-Fold: 0.965 | Stratified: 0.965 | GridSearchCV best score: 0.971 | Cross-validation provides robust model evaluation!</span>
+                    <i data-lucide="check-circle" class="text-accent w-4 h-4"></i>
+                </div>
+            </div>
+            <div class="bg-surface rounded-lg p-5 border-l-4 border-cv">
+                <p class="text-sm"><strong class="text-cv">💡 Key Insight:</strong> Cross-validation is essential for <span class="text-accent">reliable model evaluation</span>. Always use <span class="text-stratified">Stratified K-Fold</span> for classification problems. For <span class="text-primary">hyperparameter tuning</span>, use cross-validation within GridSearchCV or RandomizedSearchCV to avoid overfitting.</p>
+            </div>
+        </section>
+
+        <!-- Quick Reference -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="table" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Quick Reference: CV Methods Comparison</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-xs font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-3 py-2 text-left">Method</th><th class="px-3 py-2 text-left">Best For</th><th class="px-3 py-2 text-left">Pros</th><th class="px-3 py-2 text-left">Cons</th><th class="px-3 py-2 text-left">Complexity</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-3 py-2 text-kfold">K-Fold</td><td class="px-3 py-2">General use</td><td class="px-3 py-2 text-accent">Fast, standard</td><td class="px-3 py-2">No stratification</td><td class="px-3 py-2">O(n·K)</td></tr>
+                        <tr><td class="px-3 py-2 text-stratified">Stratified</td><td class="px-3 py-2">Classification</td><td class="px-3 py-2 text-accent">Preserves class ratio</td><td class="px-3 py-2">Only for classification</td><td class="px-3 py-2">O(n·K)</td></tr>
+                        <tr><td class="px-3 py-2 text-loocv">LOOCV</td><td class="px-3 py-2">Small datasets</td><td class="px-3 py-2 text-accent">Maximum use of data</td><td class="px-3 py-2">Very expensive</td><td class="px-3 py-2">O(n²)</td></tr>
+                        <tr><td class="px-3 py-2 text-kfold">Repeated K-Fold</td><td class="px-3 py-2">Stable estimates</td><td class="px-3 py-2 text-accent">More robust</td><td class="px-3 py-2">Slower</td><td class="px-3 py-2">O(n·K·R)</td></tr>
+                        <tr><td class="px-3 py-2 text-primary">TimeSeries</td><td class="px-3 py-2">Time series</td><td class="px-3 py-2 text-accent">Preserves order</td><td class="px-3 py-2">No shuffling</td><td class="px-3 py-2">O(n·K)</td></tr>
+                        <tr><td class="px-3 py-2 text-secondary">GroupKFold</td><td class="px-3 py-2">Grouped data</td><td class="px-3 py-2 text-accent">Keeps groups together</td><td class="px-3 py-2">Requires groups</td><td class="px-3 py-2">O(n·K)</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Best Practices -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-cv/10 to-stratified/10 rounded-xl p-6 border border-gray-700">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="check-circle" class="text-accent w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-primary text-lg mb-3">✅ Cross-Validation Best Practices</h3>
+                        <div class="grid md:grid-cols-2 gap-2 text-xs">
+                            <div class="flex items-center gap-2"><span class="text-accent">1.</span> Always use <span class="text-stratified">Stratified K-Fold</span> for classification</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">2.</span> Choose K=5 or K=10 (standard)</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">3.</span> <span class="text-cv">Shuffle</span> data before splitting</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">4.</span> Use <span class="text-primary">TimeSeriesSplit</span> for temporal data</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">5.</span> Use <span class="text-secondary">GroupKFold</span> for grouped data</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">6.</span> <span class="text-accent">Nested CV</span> for hyperparameter tuning</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">7.</span> Report <span class="text-kfold">mean ± std</span> of CV scores</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">8.</span> Use <span class="text-loocv">LOOCV</span> only for small datasets</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal Summary -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-black rounded-xl border border-gray-800 shadow-2xl overflow-hidden font-mono text-sm">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-gray-400 text-xs">cv@master:~/day30</span>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div><span class="text-green-400 font-bold">$</span> cat cross_validation_summary.md</div>
+                    <div class="text-gray-300 space-y-2 border-l-2 border-gray-800 pl-4">
+                        <p># 🔄 Day 30: Cross-Validation — Complete Guide</p>
+                        <ul class="list-disc ml-5 space-y-1 text-xs md:text-sm">
+                            <li>✅ <span class="text-cv">K-Fold:</span> Split data into K folds, train on K-1, test on 1</li>
+                            <li>✅ <span class="text-stratified">Stratified K-Fold:</span> Preserves class distribution (classification)</li>
+                            <li>✅ <span class="text-loocv">LOOCV:</span> Each sample as test set (small datasets)</li>
+                            <li>✅ <span class="text-kfold">Repeated K-Fold:</span> More stable estimates</li>
+                            <li>✅ <span class="text-primary">TimeSeriesSplit:</span> For temporal data (no shuffle)</li>
+                            <li>✅ <span class="text-secondary">GroupKFold:</span> For grouped data (patients, users)</li>
+                            <li>✅ <span class="text-accent">Nested CV:</span> For hyperparameter tuning</li>
+                        </ul>
+                        <p class="text-gray-500 mt-3">📌 Pro Tip: Always use cross-validation for model evaluation. It's the most reliable way to estimate generalization performance!</p>
+                    </div>
+                    <div><span class="text-green-400 font-bold">$</span> <span class="typing-cursor text-cv"></span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 30 · Cross-Validation · K-Fold, Stratified, LOOCV, Time Series, GroupKFold & Complete Implementation</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const textSequence = "Cross-validation complete guide loaded. K-Fold, Stratified, LOOCV, Time Series, and more...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day30&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+              </html>
