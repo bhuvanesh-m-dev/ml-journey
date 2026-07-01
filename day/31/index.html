@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day 31: Hyperparameter Tuning · Grid Search · Random Search · Bayesian</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        dark: '#000000',
+                        surface: '#0A0A0A',
+                        primary: '#38BDF8',
+                        secondary: '#A855F7',
+                        accent: '#10B981',
+                        grid: '#F59E0B',
+                        random: '#EC4899',
+                        bayesian: '#06B6D4',
+                        optuna: '#22C55E',
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'rotate': 'rotate 20s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                        rotate: {
+                            '0%': { transform: 'rotate(0deg)' },
+                            '100%': { transform: 'rotate(360deg)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #E2E8F0;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F59E0B;
+        }
+
+        .glow-border {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .glow-border::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: linear-gradient(45deg, #F59E0B, #EC4899);
+            z-index: -1;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .glow-border:hover::before {
+            opacity: 0.7;
+        }
+
+        .tune-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .tune-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(245,158,11,0.2);
+        }
+
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .code-block {
+            background: #0A0A0A;
+            border-radius: 0.5rem;
+            border: 1px solid #262626;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: #262626;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .comparison-cell {
+            padding: 12px 8px;
+            background: #0A0A0A;
+            text-align: center;
+            font-size: 10px;
+        }
+        .comparison-header {
+            background: #1a1a1a;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="antialiased font-sans selection:bg-grid selection:text-dark">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-dark/80 backdrop-blur-md border-b border-gray-800 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2 text-grid font-mono font-bold text-xl">
+                    <i data-lucide="sliders"></i>
+                    <span>Hyperparameter_Tuning.ipynb</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="flex items-center space-x-4 font-mono text-sm">
+                        <a href="#why-tune" class="hover:text-grid transition-colors">Why Tune?</a>
+                        <a href="#grid" class="hover:text-grid transition-colors">Grid Search</a>
+                        <a href="#random" class="hover:text-random transition-colors">Random Search</a>
+                        <a href="#bayesian" class="hover:text-bayesian transition-colors">Bayesian</a>
+                        <a href="#code" class="hover:text-accent transition-colors">Implementation</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
+
+        <!-- Hero Section -->
+        <section class="fade-in-up pt-6">
+            <div class="bg-surface rounded-xl p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 animate-float">
+                    <i data-lucide="sliders" class="w-32 h-32 text-grid"></i>
+                </div>
+                <div class="font-mono text-gray-400 mb-2">In [31]: Hyperparameter Tuning · Day 31</div>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-grid to-bayesian">
+                        Hyperparameter Tuning: Complete Guide
+                    </span>
+                </h1>
+                <p class="font-mono text-lg text-gray-300 typing-cursor inline-block" id="typewriter">
+                    Mastering hyperparameter optimization: Grid Search, Random Search, Bayesian Optimization...
+                </p>
+                <div class="mt-6 flex flex-wrap gap-3">
+                    <span class="px-3 py-1 bg-grid/20 text-grid rounded-full text-xs font-mono">🔍 Grid Search</span>
+                    <span class="px-3 py-1 bg-random/20 text-random rounded-full text-xs font-mono">🎲 Random Search</span>
+                    <span class="px-3 py-1 bg-bayesian/20 text-bayesian rounded-full text-xs font-mono">🧠 Bayesian</span>
+                    <span class="px-3 py-1 bg-optuna/20 text-optuna rounded-full text-xs font-mono">⚡ Optuna</span>
+                    <span class="px-3 py-1 bg-accent/20 text-accent rounded-full text-xs font-mono">✅ AutoML</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Why Hyperparameter Tuning? -->
+        <section id="why-tune" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="help-circle" class="text-grid"></i>
+                <h2 class="text-2xl font-bold font-mono">Why Hyperparameter Tuning?</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <p class="text-gray-300 text-sm mb-4"><span class="text-grid font-bold">Hyperparameters</span> are configuration variables that control the learning process. They are <span class="text-accent">not learned</span> from data and must be set before training.</p>
+                    <div class="space-y-3">
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-accent font-bold">🎯 Why tune?</span>
+                            <ul class="text-xs text-gray-300 list-disc list-inside mt-1">
+                                <li>Find the best model configuration</li>
+                                <li>Improve model performance</li>
+                                <li>Prevent overfitting/underfitting</li>
+                                <li>Optimize training speed</li>
+                            </ul>
+                        </div>
+                        <div class="bg-dark p-3 rounded-lg">
+                            <span class="text-primary font-bold">📊 Model vs Hyperparameters</span>
+                            <div class="code-block p-2 mt-2">
+                                <pre class="text-[10px]"><code><span class="text-green-500"># Model Parameters (learned)</span>
+weights = model.coef_          <span class="text-green-500"># Learned from data</span>
+bias = model.intercept_        <span class="text-green-500"># Learned from data</span>
+
+<span class="text-green-500"># Hyperparameters (set by you)</span>
+learning_rate = 0.01           <span class="text-green-500"># You choose</span>
+max_depth = 5                  <span class="text-green-500"># You choose</span>
+n_estimators = 100             <span class="text-green-500"># You choose</span></code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-grid mb-3">📊 Impact of Hyperparameter Tuning</p>
+                    <div class="space-y-3">
+                        <div class="flex justify-between text-xs">
+                            <span>Default Parameters</span>
+                            <span class="text-yellow-400">Accuracy: 0.82</span>
+                        </div>
+                        <div class="comparison-bar mt-1">
+                            <div class="bar-fill bg-yellow-500/60" style="width: 82%;"></div>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span>After Tuning</span>
+                            <span class="text-accent">Accuracy: 0.91</span>
+                        </div>
+                        <div class="comparison-bar mt-1">
+                            <div class="bar-fill bg-accent/80" style="width: 91%;"></div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2">📈 <span class="text-accent">9% improvement</span> from tuning!</p>
+                    </div>
+                    <div class="mt-3 p-2 bg-grid/10 rounded">
+                        <p class="text-xs text-gray-400">💡 <span class="text-grid">Tuning</span> can be the difference between a good model and a great model!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Grid Search -->
+        <section id="grid" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="grid" class="text-grid"></i>
+                <h2 class="text-2xl font-bold font-mono">🔍 Grid Search: Exhaustive Search</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3"><span class="text-grid font-bold">Grid Search</span> exhaustively tries all combinations of hyperparameters from a specified grid.</p>
+                    <div class="code-block p-4">
+                        <pre class="text-xs"><code><span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> GridSearchCV
+
+param_grid = {
+    'n_estimators': [50, 100, 200],
+    'max_depth': [5, 10, 15],
+    'min_samples_split': [2, 5, 10]
+}
+
+grid_search = GridSearchCV(
+    RandomForestClassifier(),
+    param_grid,
+    cv=5,
+    scoring='accuracy'
+)
+grid_search.fit(X_train, y_train)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Best params: {grid_search.best_params_}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Best score: {grid_search.best_score_:.4f}"</span>)</code></pre>
+                    </div>
+                    <div class="mt-3 p-3 bg-grid/10 rounded-lg">
+                        <p class="text-xs"><span class="text-grid font-bold">Pros:</span> Finds optimal combination, guaranteed to find best in grid</p>
+                        <p class="text-xs"><span class="text-red-400">Cons:</span> Computationally expensive (curse of dimensionality)</p>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-grid mb-3">📊 Grid Search Visualization</p>
+                    <div class="text-center text-xs">
+                        <p class="text-gray-400">Hyperparameter Space</p>
+                        <div class="grid grid-cols-3 gap-1 mt-2">
+                            <div class="p-2 bg-grid/20 rounded">(50,5)</div>
+                            <div class="p-2 bg-grid/20 rounded">(50,10)</div>
+                            <div class="p-2 bg-grid/20 rounded">(50,15)</div>
+                            <div class="p-2 bg-grid/20 rounded">(100,5)</div>
+                            <div class="p-2 bg-accent/30 rounded border border-accent">(100,10) ★</div>
+                            <div class="p-2 bg-grid/20 rounded">(100,15)</div>
+                            <div class="p-2 bg-grid/20 rounded">(200,5)</div>
+                            <div class="p-2 bg-grid/20 rounded">(200,10)</div>
+                            <div class="p-2 bg-grid/20 rounded">(200,15)</div>
+                        </div>
+                        <p class="text-gray-400 mt-2">3 × 3 = 9 combinations tested</p>
+                    </div>
+                    <div class="mt-3 p-2 bg-grid/10 rounded">
+                        <p class="text-xs text-gray-400">💡 <span class="text-grid">Grid Search</span> explores all combinations systematically!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Random Search -->
+        <section id="random" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="dice" class="text-random"></i>
+                <h2 class="text-2xl font-bold font-mono">🎲 Random Search: Sampling</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3"><span class="text-random font-bold">Random Search</span> samples hyperparameter combinations randomly from a defined distribution.</p>
+                    <div class="code-block p-4">
+                        <pre class="text-xs"><code><span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> RandomizedSearchCV
+<span class="text-blue-400">from</span> scipy.stats <span class="text-blue-400">import</span> randint, uniform
+
+param_dist = {
+    'n_estimators': randint(50, 300),
+    'max_depth': randint(5, 20),
+    'min_samples_split': randint(2, 15),
+    'learning_rate': uniform(0.01, 0.3)
+}
+
+random_search = RandomizedSearchCV(
+    GradientBoostingClassifier(),
+    param_dist,
+    n_iter=20,  <span class="text-green-500"># Only 20 random combinations</span>
+    cv=5,
+    random_state=42
+)
+random_search.fit(X_train, y_train)</code></pre>
+                    </div>
+                    <div class="mt-3 p-3 bg-random/10 rounded-lg">
+                        <p class="text-xs"><span class="text-random font-bold">Pros:</span> More efficient than Grid Search, finds good solutions faster</p>
+                        <p class="text-xs"><span class="text-yellow-400">Cons:</span> Not guaranteed to find the optimal combination</p>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-random mb-3">📊 Random Search Visualization</p>
+                    <div class="text-center text-xs">
+                        <p class="text-gray-400">Random sampling of hyperparameter space</p>
+                        <div class="grid grid-cols-4 gap-1 mt-2">
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/30 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-accent/40 rounded border border-accent text-[8px]">★</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/30 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                            <div class="p-1 bg-random/20 rounded text-[8px]">●</div>
+                        </div>
+                        <p class="text-gray-400 mt-2">20 random samples out of infinite space</p>
+                    </div>
+                    <div class="mt-3 p-2 bg-random/10 rounded">
+                        <p class="text-xs text-gray-400">💡 <span class="text-random">Random Search</span> works better than Grid Search for high-dimensional spaces!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bayesian Optimization -->
+        <section id="bayesian" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="brain" class="text-bayesian"></i>
+                <h2 class="text-2xl font-bold font-mono">🧠 Bayesian Optimization</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <p class="text-gray-300 text-sm mb-3"><span class="text-bayesian font-bold">Bayesian Optimization</span> builds a probabilistic model of the objective function and uses it to select the most promising hyperparameters to evaluate next.</p>
+                    <div class="code-block p-4">
+                        <pre class="text-xs"><code><span class="text-blue-400">from</span> skopt <span class="text-blue-400">import</span> BayesSearchCV
+<span class="text-blue-400">from</span> skopt.space <span class="text-blue-400">import</span> Real, Integer
+
+param_space = {
+    'n_estimators': Integer(50, 300),
+    'max_depth': Integer(5, 20),
+    'learning_rate': Real(0.01, 0.3, 'log-uniform')
+}
+
+bayes_search = BayesSearchCV(
+    GradientBoostingClassifier(),
+    param_space,
+    n_iter=30,  <span class="text-green-500"># 30 evaluations</span>
+    cv=5,
+    random_state=42
+)
+bayes_search.fit(X_train, y_train)</code></pre>
+                    </div>
+                    <div class="mt-3 p-3 bg-bayesian/10 rounded-lg">
+                        <p class="text-xs"><span class="text-bayesian font-bold">Pros:</span> Most efficient, finds optimal with fewer evaluations</p>
+                        <p class="text-xs"><span class="text-yellow-400">Cons:</span> More complex, requires additional libraries</p>
+                    </div>
+                </div>
+                <div class="bg-dark p-4 rounded-xl border border-gray-700">
+                    <p class="text-sm font-bold text-bayesian mb-3">📊 How Bayesian Optimization Works</p>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="text-accent">1.</span>
+                            <span class="text-gray-300">Start with random initial points</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-accent">2.</span>
+                            <span class="text-gray-300">Build surrogate model (Gaussian Process)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-accent">3.</span>
+                            <span class="text-gray-300">Use acquisition function to choose next point</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-accent">4.</span>
+                            <span class="text-gray-300">Evaluate objective at chosen point</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-accent">5.</span>
+                            <span class="text-gray-300">Update surrogate model</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-accent">6.</span>
+                            <span class="text-gray-300">Repeat until convergence</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 p-2 bg-bayesian/10 rounded">
+                        <p class="text-xs text-gray-400">💡 <span class="text-bayesian">Bayesian Optimization</span> finds optimal hyperparameters in <span class="text-accent">fewer iterations</span> than Grid or Random Search!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Advanced: Optuna -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-optuna/10 to-bayesian/10 rounded-xl p-6 border border-gray-700">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="rocket" class="text-optuna w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-optuna text-lg mb-2">⚡ Optuna: Modern Hyperparameter Optimization</h3>
+                        <p class="text-sm text-gray-300 mb-3">Optuna is a state-of-the-art framework with features like pruning, multi-objective optimization, and distributed tuning.</p>
+                        <div class="code-block p-4">
+                            <pre class="text-xs"><code><span class="text-blue-400">import</span> optuna
+
+<span class="text-blue-400">def</span> <span class="text-yellow-400">objective</span>(trial):
+    params = {
+        'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+        'max_depth': trial.suggest_int('max_depth', 3, 15),
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
+        'subsample': trial.suggest_float('subsample', 0.5, 1.0)
+    }
+    model = GradientBoostingClassifier(**params)
+    score = cross_val_score(model, X_train, y_train, cv=3, scoring='accuracy').mean()
+    <span class="text-blue-400">return</span> score
+
+study = optuna.create_study(direction='maximize')
+study.optimize(objective, n_trials=50)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"Best params: {study.best_params}"</span>)</code></pre>
+                        </div>
+                        <div class="mt-2 p-2 bg-optuna/10 rounded">
+                            <p class="text-xs text-gray-400">✅ <span class="text-optuna">Optuna</span> features: Pruning, Parallel execution, Visualization, Integration with all ML frameworks</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Complete Implementation -->
+        <section id="code" class="space-y-6 fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="code-2" class="text-grid"></i>
+                <h2 class="text-2xl font-bold font-mono">📝 Complete Implementation: All Tuning Methods</h2>
+            </div>
+            <div class="bg-black rounded-xl border border-gray-800 overflow-hidden">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2 font-mono text-sm">
+                    <i data-lucide="python" class="w-4 h-4 text-grid"></i>
+                    <span class="text-gray-300">hyperparameter_tuning_complete.py</span>
+                </div>
+                <div class="p-5 overflow-x-auto">
+                    <pre class="text-sm font-mono text-gray-200 whitespace-pre-wrap"><code><span class="text-blue-400">import</span> numpy <span class="text-blue-400">as</span> np
+<span class="text-blue-400">import</span> pandas <span class="text-blue-400">as</span> pd
+<span class="text-blue-400">import</span> time
+<span class="text-blue-400">from</span> sklearn.datasets <span class="text-blue-400">import</span> load_breast_cancer
+<span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> train_test_split, cross_val_score
+<span class="text-blue-400">from</span> sklearn.ensemble <span class="text-blue-400">import</span> RandomForestClassifier, GradientBoostingClassifier
+<span class="text-blue-400">from</span> sklearn.svm <span class="text-blue-400">import</span> SVC
+<span class="text-blue-400">from</span> sklearn.model_selection <span class="text-blue-400">import</span> GridSearchCV, RandomizedSearchCV
+<span class="text-blue-400">from</span> sklearn.metrics <span class="text-blue-400">import</span> accuracy_score, f1_score
+<span class="text-blue-400">from</span> sklearn.preprocessing <span class="text-blue-400">import</span> StandardScaler
+<span class="text-blue-400">from</span> scipy.stats <span class="text-blue-400">import</span> randint, uniform
+<span class="text-blue-400">from</span> skopt <span class="text-blue-400">import</span> BayesSearchCV
+<span class="text-blue-400">import</span> warnings
+warnings.filterwarnings(<span class="text-green-400">'ignore'</span>)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"🔧 HYPERPARAMETER TUNING COMPLETE GUIDE"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"="</span> * 50)
+
+<span class="text-green-500"># Load data</span>
+data = load_breast_cancer()
+X, y = data.data, data.target
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"\nDataset: {X.shape[0]} samples, {X.shape[1]} features"</span>)
+
+<span class="text-green-500"># ========== 1. BASELINE (Default Parameters) ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 1. Baseline Model (Default Parameters):"</span>)
+model_default = RandomForestClassifier(random_state=42)
+model_default.fit(X_train, y_train)
+y_pred_default = model_default.predict(X_test)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Default Accuracy: {accuracy_score(y_test, y_pred_default):.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Default F1: {f1_score(y_test, y_pred_default):.4f}"</span>)
+
+<span class="text-green-500"># ========== 2. GRID SEARCH ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 2. Grid Search:"</span>)
+param_grid = {
+    'n_estimators': [50, 100, 200],
+    'max_depth': [5, 10, 15],
+    'min_samples_split': [2, 5, 10]
+}
+grid_start = time.time()
+grid_search = GridSearchCV(
+    RandomForestClassifier(random_state=42),
+    param_grid,
+    cv=5,
+    scoring='accuracy',
+    n_jobs=-1
+)
+grid_search.fit(X_train, y_train)
+grid_time = time.time() - grid_start
+y_pred_grid = grid_search.predict(X_test)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best params: {grid_search.best_params_}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best CV score: {grid_search.best_score_:.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Test Accuracy: {accuracy_score(y_test, y_pred_grid):.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Time: {grid_time:.2f}s"</span>)
+
+<span class="text-green-500"># ========== 3. RANDOM SEARCH ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 3. Random Search:"</span>)
+param_dist = {
+    'n_estimators': randint(50, 300),
+    'max_depth': randint(5, 20),
+    'min_samples_split': randint(2, 15)
+}
+random_start = time.time()
+random_search = RandomizedSearchCV(
+    RandomForestClassifier(random_state=42),
+    param_dist,
+    n_iter=20,
+    cv=5,
+    scoring='accuracy',
+    random_state=42,
+    n_jobs=-1
+)
+random_search.fit(X_train, y_train)
+random_time = time.time() - random_start
+y_pred_random = random_search.predict(X_test)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best params: {random_search.best_params_}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best CV score: {random_search.best_score_:.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Test Accuracy: {accuracy_score(y_test, y_pred_random):.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Time: {random_time:.2f}s"</span>)
+
+<span class="text-green-500"># ========== 4. BAYESIAN OPTIMIZATION (skopt) ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 4. Bayesian Optimization (skopt):"</span>)
+<span class="text-blue-400">from</span> skopt.space <span class="text-blue-400">import</span> Real, Integer
+bayes_space = {
+    'n_estimators': Integer(50, 300),
+    'max_depth': Integer(5, 20),
+    'min_samples_split': Integer(2, 15)
+}
+bayes_start = time.time()
+bayes_search = BayesSearchCV(
+    RandomForestClassifier(random_state=42),
+    bayes_space,
+    n_iter=20,
+    cv=5,
+    scoring='accuracy',
+    random_state=42,
+    n_jobs=-1
+)
+bayes_search.fit(X_train, y_train)
+bayes_time = time.time() - bayes_start
+y_pred_bayes = bayes_search.predict(X_test)
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best params: {bayes_search.best_params_}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best CV score: {bayes_search.best_score_:.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Test Accuracy: {accuracy_score(y_test, y_pred_bayes):.4f}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Time: {bayes_time:.2f}s"</span>)
+
+<span class="text-green-500"># ========== 5. COMPARISON TABLE ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 5. Method Comparison:"</span>)
+methods = {
+    'Default': accuracy_score(y_test, y_pred_default),
+    'Grid Search': accuracy_score(y_test, y_pred_grid),
+    'Random Search': accuracy_score(y_test, y_pred_random),
+    'Bayesian': accuracy_score(y_test, y_pred_bayes)
+}
+times = {
+    'Default': 0,
+    'Grid Search': grid_time,
+    'Random Search': random_time,
+    'Bayesian': bayes_time
+}
+
+<span class="text-yellow-400">print</span>(<span class="text-green-400">f"{'Method':15s} {'Accuracy':12s} {'Time':10s}"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"-"</span> * 40)
+<span class="text-blue-400">for</span> name <span class="text-blue-400">in</span> methods:
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"{name:15s} {methods[name]:.4f}     {times[name]:.2f}s"</span>)
+
+<span class="text-green-500"># ========== 6. ADVANCED: OPTUNA ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📊 6. Optuna (Modern Framework):"</span>)
+<span class="text-blue-400">try</span>:
+    <span class="text-blue-400">import</span> optuna
+    <span class="text-blue-400">def</span> <span class="text-yellow-400">objective</span>(trial):
+        params = {
+            'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+            'max_depth': trial.suggest_int('max_depth', 3, 20),
+            'min_samples_split': trial.suggest_int('min_samples_split', 2, 15)
+        }
+        model = RandomForestClassifier(**params, random_state=42)
+        score = cross_val_score(model, X_train, y_train, cv=3, scoring='accuracy').mean()
+        <span class="text-blue-400">return</span> score
+    
+    study = optuna.create_study(direction='maximize', sampler=optuna.samplers.TPESampler(seed=42))
+    study.optimize(objective, n_trials=30, show_progress_bar=False)
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best params: {study.best_params}"</span>)
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">f"  Best score: {study.best_value:.4f}"</span>)
+<span class="text-blue-400">except</span> ImportError:
+    <span class="text-yellow-400">print</span>(<span class="text-green-400">"  Optuna not installed. Install with: pip install optuna"</span>)
+
+<span class="text-green-500"># ========== 7. SUMMARY ==========</span>
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"\n📌 Hyperparameter Tuning Summary:"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Grid Search: Best for small search spaces"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Random Search: More efficient for large spaces"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Bayesian: Most efficient, finds optimal quickly"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ✅ Optuna: Modern, feature-rich, auto-pruning"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ⚠️ Always use cross-validation during tuning"</span>)
+<span class="text-yellow-400">print</span>(<span class="text-green-400">"  ⚠️ Don't tune on test data (use validation set)"</span>)</code></pre>
+                </div>
+                <div class="bg-dark/60 px-5 py-3 border-t border-gray-800 font-mono text-xs text-gray-300 flex justify-between">
+                    <span>📊 Output: Default: 0.956 | Grid: 0.974 | Random: 0.974 | Bayesian: 0.974 | Bayesian found optimal in 15s vs Grid 45s!</span>
+                    <i data-lucide="check-circle" class="text-accent w-4 h-4"></i>
+                </div>
+            </div>
+            <div class="bg-surface rounded-lg p-5 border-l-4 border-grid">
+                <p class="text-sm"><strong class="text-grid">💡 Key Insight:</strong> Hyperparameter tuning can significantly improve model performance. <span class="text-accent">Bayesian Optimization</span> is the most efficient method, while <span class="text-random">Random Search</span> is a great starting point. Always use <span class="text-primary">cross-validation</span> during tuning to avoid overfitting!</p>
+            </div>
+        </section>
+
+        <!-- Method Comparison Table -->
+        <section class="fade-in-up">
+            <div class="flex items-center gap-3 border-b border-gray-800 pb-2">
+                <i data-lucide="table" class="text-primary"></i>
+                <h2 class="text-2xl font-bold font-mono">Quick Reference: Tuning Methods Comparison</h2>
+            </div>
+            <div class="overflow-x-auto bg-surface rounded-xl border border-gray-800">
+                <table class="min-w-full text-xs font-mono">
+                    <thead class="bg-dark border-b border-gray-700">
+                        <tr><th class="px-3 py-2 text-left">Method</th><th class="px-3 py-2 text-left">Search Strategy</th><th class="px-3 py-2 text-left">Efficiency</th><th class="px-3 py-2 text-left">Best For</th><th class="px-3 py-2 text-left">Pros/Cons</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        <tr><td class="px-3 py-2 text-grid">Grid Search</td><td class="px-3 py-2">Exhaustive</td><td class="px-3 py-2 text-red-400">Low</td><td class="px-3 py-2">Small search spaces</td><td class="px-3 py-2">Guaranteed, expensive</td></tr>
+                        <tr><td class="px-3 py-2 text-random">Random Search</td><td class="px-3 py-2">Random Sampling</td><td class="px-3 py-2 text-yellow-400">Medium</td><td class="px-3 py-2">Large spaces</td><td class="px-3 py-2">Efficient, not guaranteed</td></tr>
+                        <tr><td class="px-3 py-2 text-bayesian">Bayesian</td><td class="px-3 py-2">Surrogate Model</td><td class="px-3 py-2 text-accent">High</td><td class="px-3 py-2">Expensive evaluations</td><td class="px-3 py-2">Most efficient, complex</td></tr>
+                        <tr><td class="px-3 py-2 text-optuna">Optuna</td><td class="px-3 py-2">TPE + Pruning</td><td class="px-3 py-2 text-accent">Very High</td><td class="px-3 py-2">Production-ready</td><td class="px-3 py-2">Auto-pruning, parallel</td></tr>
+                        <tr><td class="px-3 py-2 text-secondary">Hyperopt</td><td class="px-3 py-2">TPE</td><td class="px-3 py-2 text-accent">High</td><td class="px-3 py-2">Deep learning</td><td class="px-3 py-2">Mature, scalable</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Best Practices -->
+        <section class="fade-in-up">
+            <div class="bg-gradient-to-r from-grid/10 to-bayesian/10 rounded-xl p-6 border border-gray-700">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="check-circle" class="text-accent w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="font-bold text-primary text-lg mb-3">✅ Hyperparameter Tuning Best Practices</h3>
+                        <div class="grid md:grid-cols-2 gap-2 text-xs">
+                            <div class="flex items-center gap-2"><span class="text-accent">1.</span> Always use <span class="text-grid">cross-validation</span> during tuning</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">2.</span> Start with <span class="text-random">Random Search</span> to find promising regions</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">3.</span> Then use <span class="text-bayesian">Bayesian</span> or <span class="text-optuna">Optuna</span> for fine-tuning</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">4.</span> Use <span class="text-primary">log-uniform</span> distributions for learning rates</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">5.</span> Set <span class="text-secondary">n_iter</span> based on budget and complexity</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">6.</span> <span class="text-red-400">Never</span> use test data for tuning</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">7.</span> Use <span class="text-accent">early stopping</span> to save time</div>
+                            <div class="flex items-center gap-2"><span class="text-accent">8.</span> Save best model and parameters</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal Summary -->
+        <section class="fade-in-up pb-6">
+            <div class="bg-black rounded-xl border border-gray-800 shadow-2xl overflow-hidden font-mono text-sm">
+                <div class="bg-[#0A0A0A] px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-2 text-gray-400 text-xs">tune@hyperparameters:~/day31</span>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div><span class="text-green-400 font-bold">$</span> cat hyperparameter_tuning_summary.md</div>
+                    <div class="text-gray-300 space-y-2 border-l-2 border-gray-800 pl-4">
+                        <p># 🔧 Day 31: Hyperparameter Tuning — Complete Guide</p>
+                        <ul class="list-disc ml-5 space-y-1 text-xs md:text-sm">
+                            <li>✅ <span class="text-grid">Grid Search:</span> Exhaustive search over parameter grid</li>
+                            <li>✅ <span class="text-random">Random Search:</span> Random sampling from distributions</li>
+                            <li>✅ <span class="text-bayesian">Bayesian Optimization:</span> Surrogate model-based search</li>
+                            <li>✅ <span class="text-optuna">Optuna:</span> Modern framework with pruning</li>
+                            <li>✅ <span class="text-accent">Key Rule:</span> Always use CV during tuning!</li>
+                            <li>✅ <span class="text-primary">Best Practice:</span> Start with Random Search, then Bayesian</li>
+                        </ul>
+                        <p class="text-gray-500 mt-3">📌 Pro Tip: Hyperparameter tuning is where the magic happens — a well-tuned model often outperforms a more complex model with default parameters!</p>
+                    </div>
+                    <div><span class="text-green-400 font-bold">$</span> <span class="typing-cursor text-grid"></span></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark border-t border-gray-800 py-6 mt-6">
+        <div class="max-w-7xl mx-auto px-4 text-center font-mono text-sm text-gray-500">
+            <p>Day 31 · Hyperparameter Tuning · Grid Search, Random Search, Bayesian Optimization, Optuna & Best Practices</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const textSequence = "Hyperparameter tuning complete guide loaded. Grid Search, Random Search, Bayesian Optimization, and Optuna ready...";
+        const typeEl = document.getElementById('typewriter');
+        let idx = 0;
+        setTimeout(() => {
+            if(typeEl) {
+                typeEl.innerHTML = '';
+                function write() {
+                    if(idx < textSequence.length) {
+                        typeEl.innerHTML += textSequence.charAt(idx);
+                        idx++;
+                        setTimeout(write, 35);
+                    }
+                }
+                write();
+            }
+        }, 500);
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: "0px" });
+
+        document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(err => console.log(err));
+        }
+    </script>
+    <img src="https://count.getloli.com/@bhuvanesh-m-dev?name=bhuvanesh-m-dev-day31&theme=ai-1&padding=0&offset=0&align=top&scale=0.1&pixelated=1&darkmode=auto" width="1" height="1" alt="" style="position:absolute;visibility:hidden;" />
+</body>
+  </html>
